@@ -278,8 +278,9 @@ local function Build()
     Check("Hide icons in combat", function() return ns.db.combat.hide end, function(v) ns.db.combat.hide = v end)
     Slider("Opacity in combat, %", ns.MIN_COMBAT_ALPHA * 100, 100, 5, function() return math.floor(ns.db.combat.alpha * 100 + 0.5) end, function(v) ns.db.combat.alpha = v / 100 end)
     Slider("Opacity out of combat, %", 0, 100, 5, function() return math.floor(ns.db.combat.idleAlpha * 100 + 0.5) end, function(v) ns.db.combat.idleAlpha = v / 100 end)
-    Note("Hiding and click-through take effect from the next combat if changed during a fight. " ..
-        "Icons that appear in the middle of combat are shown as a reminder but are not clickable until combat ends.")
+    Note("Click-through can't change during a fight (the game locks mouse input in combat): it applies after combat. " ..
+        "Hiding applies at once, but icons hidden when the fight started stay hidden until it ends. " ..
+        "Without click-through, icons are clickable in combat, and a faded-out icon still takes clicks at its spot.")
     SubHeader("Appearance")
     Cycle("Highlight type", ns.GLOW_MODES, function() return ns.db.glowMode end, function(v) ns.db.glowMode = v end)
     Cycle("Outline style", ns.GLOW_STYLES, function() return ns.db.glowStyle end, function(v) ns.db.glowStyle = v end)

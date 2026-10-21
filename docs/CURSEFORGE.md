@@ -79,8 +79,8 @@ Voidwalker, Succubus, Incubus, Felhunter or Felguard.
 - **Click-through in combat**: in combat the icons ignore the mouse, so you can click targets and turn the
   camera right through them.
 - **Combat simulation**: preview out of combat how everything will look and behave once a fight starts.
-- Icons visible when combat starts stay clickable for the whole fight. Icons that weren't needed never block
-  your clicks.
+- Icons appear and disappear in combat just like out of combat, even while WoW hides auras: the addon
+  follows your buffs through the fight. Icons stay clickable in combat unless you turn on click-through.
 
 ---
 
@@ -111,11 +111,11 @@ button in the settings. The shard counter and the Soulstone label are dragged wi
 
 ## Good to know
 
-- WoW doesn't allow secure buttons to be shown, hidden or moved in combat. If an icon becomes needed
-  mid-fight, it appears as a reminder and becomes clickable once combat ends. Settings changed in combat
+- WoW doesn't allow secure buttons to be shown, hidden or moved in combat, so icons fade in and out instead;
+  a faded-out icon still takes clicks at its spot unless click-through is on. Settings changed in combat
   apply after combat.
-- WoW Forever may hide auras in combat. The addon then keeps the last known state and updates it from your own
-  casts (Demon Armor, Soulstone).
+- WoW Forever hides auras in combat. The addon remembers your buffs before the fight and notices in combat
+  when they are removed or run out.
 - Spell and item IDs come from Classic Era. If anything differs in Forever, the addon looks the spell up by name.
 
 ## Feedback

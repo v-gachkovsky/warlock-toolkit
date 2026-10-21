@@ -99,25 +99,65 @@ end
 -- Events
 ------------------------------------------------------------------------
 local eventFrame = CreateFrame("Frame")
+local unitEventFrame = CreateFrame("Frame")
 local handlers = {}
+ns.eventStatus = {} -- event -> how it got registered, or why it failed (shown by /wlt auras)
+
+local function OnEvent(_, event, ...)
+    local list = handlers[event]
+    if not list then return end
+    for i = 1, #list do
+        xpcall(list[i], geterrorhandler(), event, ...)
+    end
+end
+
+-- UNIT_AURA arrives on this client only per unit (as the game's own frames register it), and
+-- RegisterUnitEvent takes two units per frame. Raid members aren't covered: modules poll those.
+local AURA_UNITS = { { "player", "target" }, { "focus", "pet" }, { "party1", "party2" }, { "party3", "party4" } }
+
+local function RegisterUnitAuraEvent()
+    local any, errors = false, {}
+    for _, pair in ipairs(AURA_UNITS) do
+        local f = CreateFrame("Frame")
+        local ok, err = pcall(f.RegisterUnitEvent, f, "UNIT_AURA", pair[1], pair[2])
+        if ok then
+            f:SetScript("OnEvent", OnEvent)
+            any = true
+        else
+            errors[#errors + 1] = tostring(err)
+        end
+    end
+    ns.eventStatus.UNIT_AURA = any and "RegisterUnitEvent (player, target, focus, pet, party1-4)"
+        or ("FAILED: " .. table.concat(errors, "; "))
+    return any
+end
 
 function ns:RegisterEvent(event, fn)
+    if not handlers[event] and event == "UNIT_AURA" then
+        if not RegisterUnitAuraEvent() then return false end
+        handlers[event] = {}
+    end
     if not handlers[event] then
-        -- Unknown events throw on the Forever client, so register defensively.
-        if not pcall(eventFrame.RegisterEvent, eventFrame, event) then return false end
+        -- Unknown events throw on the Forever client, so register defensively. A unit event
+        -- refused for all units may still be allowed for the player and the target.
+        local ok, err = pcall(eventFrame.RegisterEvent, eventFrame, event)
+        if ok then
+            ns.eventStatus[event] = "RegisterEvent"
+        elseif event:match("^UNIT_") and unitEventFrame.RegisterUnitEvent
+            and pcall(unitEventFrame.RegisterUnitEvent, unitEventFrame, event, "player", "target") then
+            ns.eventStatus[event] = "RegisterUnitEvent(player, target); RegisterEvent: " .. tostring(err)
+        else
+            ns.eventStatus[event] = "FAILED: " .. tostring(err)
+            return false
+        end
         handlers[event] = {}
     end
     table.insert(handlers[event], fn)
     return true
 end
 
-eventFrame:SetScript("OnEvent", function(_, event, ...)
-    local list = handlers[event]
-    if not list then return end
-    for i = 1, #list do
-        xpcall(list[i], geterrorhandler(), event, ...)
-    end
-end)
+eventFrame:SetScript("OnEvent", OnEvent)
+unitEventFrame:SetScript("OnEvent", OnEvent)
 
 ------------------------------------------------------------------------
 -- Modules
@@ -127,6 +167,22 @@ function ns:NewModule(name)
     self.modules[name] = m
     table.insert(self.moduleList, m)
     return m
+end
+
+-- Timeline for /wlt auras: what happened when (ms precision), to find where reactions lag.
+ns.trace = {}
+function ns.Trace(fmt, ...)
+    local ok, msg = pcall(string.format, fmt, ...)
+    table.insert(ns.trace, 1, { t = GetTime(), msg = ok and msg or fmt })
+    ns.trace[25] = nil
+end
+
+-- UpdateAll on the next frame, coalescing bursts of triggers (buff frame, Cooldown Manager).
+local updatePending
+function ns:ScheduleUpdate()
+    if updatePending then return end
+    updatePending = true
+    C_Timer.After(0, function() updatePending = false; ns:UpdateAll() end)
 end
 
 function ns:UpdateAll()
@@ -205,11 +261,18 @@ function ns.ItemIcon(id)
     if GetItemIcon then return GetItemIcon(id) end
 end
 
+-- Bag count, or nil when unreadable (secret in combat): callers keep their last known state.
 function ns.ItemCount(id)
     local f = (C_Item and C_Item.GetItemCount) or GetItemCount
     local ok, n = pcall(f, id)
     if ok and type(n) == "number" and not ns.IsSecret(n) then return n end
-    return 0
+end
+
+-- true / false from fn(...), or nil when it fails or returns a secret value.
+function ns.Bool(fn, ...)
+    local ok, v = pcall(fn, ...)
+    if not ok or ns.IsSecret(v) then return nil end
+    return v and true or false
 end
 
 -- Highest known spell from a rank list (ids or {spell=id} entries).
@@ -251,25 +314,264 @@ function ns.DemonSpell(demon)
     return (ns.HighestKnown(demon.list))
 end
 
--- true / false, or nil when auras are unreadable (secret in combat).
-function ns.PlayerHasAura(ids)
+-- The player's aura from `ids` (AuraData), false if there is none, or nil when auras are
+-- unreadable: secret auras read as "not found" instead of failing, so in combat that's unknown.
+function ns.PlayerAura(ids)
     if not C_UnitAuras then return nil end
     local unknown = false
     for _, id in ipairs(ids) do
         local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, id)
-        if not ok then unknown = true elseif aura then return true end
+        if not ok or ns.IsSecret(aura) then unknown = true elseif aura then return aura end
     end
     if C_UnitAuras.GetAuraDataBySpellName then
         for _, id in ipairs(ids) do
             local name = ns.SpellName(id)
             if name then
                 local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, "player", name, "HELPFUL")
-                if not ok then unknown = true elseif aura then return true end
+                if not ok or ns.IsSecret(aura) then unknown = true elseif aura then return aura end
             end
         end
     end
-    if unknown then return nil end
+    if unknown or ns.AurasSecret() then return nil end
     return false
+end
+
+-- true / false, or nil when auras are unreadable (secret in combat).
+function ns.PlayerHasAura(ids)
+    local aura = ns.PlayerAura(ids)
+    if aura == nil then return nil end
+    return aura ~= false
+end
+
+-- Whether an aura instance seen earlier is still on `unit`: true / false, or nil if unknown.
+-- Works with secret auras: a removed instance reads as nil, a present one as (secret) data.
+function ns.AuraInstanceExists(unit, instanceID)
+    if not instanceID or not (C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID) then return nil end
+    local ok, aura = pcall(C_UnitAuras.GetAuraDataByAuraInstanceID, unit, instanceID)
+    if not ok or ns.IsSecret(aura) then return nil end
+    return aura ~= nil
+end
+
+-- Follows a player buff through combat, where its aura is secret: out of combat it remembers
+-- the aura instance and end time, in combat those tell whether it was removed or ran out.
+-- In combat the aura API is closed to addons, but the game's buff frame keeps a readable list
+-- of the player's buffs (instance ID, icon, expiration). Returns that list, or nil.
+local function BuffFrameAuras()
+    local list = BuffFrame and BuffFrame.auraInfo
+    if type(list) ~= "table" or ns.IsSecret(list) then return nil end
+    return list
+end
+
+local BuffTracker = {}
+local CAST_WINDOW = 1 -- seconds between our cast and its aura showing up, in either order
+local CAST_GRACE = 2  -- after our cast, the buff frame may not list the new aura yet
+
+local function Plain(v)
+    if v ~= nil and not ns.IsSecret(v) then return v end
+end
+
+-- Takes aura instance `id` as the buff.
+function BuffTracker:Claim(id, expires)
+    self.has, self.instance, self.castAt, self.prevInstance = true, id, nil, nil
+    if expires then self.expires = expires end
+end
+
+-- The buff was just cast. In combat its new aura can't be read by spell, so it's timed
+-- by `duration` until the buff frame or an aura update shows its new instance.
+function BuffTracker:Cast()
+    self.has = true
+    self.prevInstance, self.instance = self.instance, nil
+    self.expires = self.duration and GetTime() + self.duration or nil
+    self.castAt = GetTime()
+    self.viewerSawCast = false
+    -- The cast event comes before the buff frame lists the new aura: remember the count of buffs
+    -- now, so a later entry shows the aura has arrived (see FindInBuffFrame).
+    local list = BuffFrameAuras()
+    self.castCount = list and #list or nil
+    ns.Trace("%s: cast", self.name or "buff")
+end
+
+-- UNIT_AURA update info for the player: catches the buff's removal and, in combat, its new instance.
+function BuffTracker:OnAuraUpdate(info)
+    self.lastInfo = { at = GetTime(), info = info } -- for /wlt auras
+    if type(info) ~= "table" or ns.IsSecret(info) then return end
+    local now = GetTime()
+    local justCast = self.castAt and now - self.castAt <= CAST_WINDOW
+    for _, id in ipairs(Plain(info.removedAuraInstanceIDs) or {}) do
+        if Plain(id) and id == self.instance then self.has, self.instance, self.expires = false, nil, nil end
+    end
+    for _, id in ipairs(Plain(info.updatedAuraInstanceIDs) or {}) do
+        -- Recast while up: the same instance is refreshed.
+        if justCast and Plain(id) and id == self.prevInstance then self:Claim(id) end
+    end
+    for _, a in ipairs(Plain(info.addedAuras) or {}) do
+        local id = not ns.IsSecret(a) and Plain(a.auraInstanceID)
+        if id then
+            local spell, exp = Plain(a.spellId), Plain(a.expirationTime)
+            exp = exp and exp > 0 and exp or nil
+            -- Only a readable spell ID counts: other buffs (food, other players) must never be taken for ours.
+            if spell and self.isID[spell] then self:Claim(id, exp) end
+        end
+    end
+end
+
+-- true / false, or nil while the state has never been readable.
+-- The buff in the game's buff frame list, matched by its remembered instance or by the icon of
+-- one of its spells (a buff cast in combat has a new instance); other buffs (food, other players'
+-- buffs) never match. false if it's not there, nil if unreadable or the list may be cut short.
+-- Icons of the buff's spells, to recognize it in the buff frame. Secret values (in combat)
+-- can't be table keys, so only readable ones are added; the aura's own icon comes from Read().
+function BuffTracker:AddSpellIcons()
+    if self.spellIconsAdded then return end
+    local complete = true
+    for _, id in ipairs(self.ids) do
+        local ok, tex = pcall(ns.SpellTexture, id)
+        if ok and Plain(tex) then self.icons[tex] = true elseif not ok or ns.IsSecret(tex) then complete = false end
+    end
+    self.spellIconsAdded = complete
+end
+
+function BuffTracker:FindInBuffFrame()
+    local list = BuffFrameAuras()
+    if not list then return nil end
+    self:AddSpellIcons()
+    -- Auras applied in combat may carry a secret icon: such an entry could be ours or anyone's.
+    local unidentified = false
+    for _, a in ipairs(list) do
+        if type(a) ~= "table" or ns.IsSecret(a) then
+            unidentified = true
+        elseif a.auraType ~= "Buff" then
+            -- weapon enchants
+        else
+            local id, tex = Plain(a.auraInstanceID), Plain(a.texture)
+            if (id and id == self.instance) or (tex and self.icons[tex]) then return a end
+            if not tex then unidentified = true end
+        end
+    end
+    -- A full list may have left our buff out: unknown rather than missing.
+    local max = Plain(BuffFrame.maxAuras)
+    if max and #list >= max then return nil end
+    -- Our known instance is gone: removed. But only if every entry is readable: in combat the game
+    -- re-reads all buffs on any change, its entries turn secret and ours may be among them.
+    if self.instance and not unidentified then return false end
+    -- Just cast: wait until the buff frame lists the new aura (one more entry than at the cast);
+    -- after that, its disappearance counts at once.
+    if self.castAt and self.castCount and GetTime() - self.castAt < CAST_GRACE then
+        if #list > self.castCount then self.castCount = nil else return nil end
+    end
+    -- Recast in combat: an unidentified entry may be the new one, so keep the state the cast set.
+    if unidentified then return nil end
+    return false
+end
+
+-- Blizzard's Cooldown Manager: its tracked-buff items name their spell and whether the buff is
+-- active, readable in combat. Only buffs the player added to the Cooldown Manager have an item.
+local VIEWERS = { "BuffIconCooldownViewer", "BuffBarCooldownViewer" }
+local VIEWER_SPELL_FIELDS = { "spellID", "overrideSpellID", "overrideTooltipSpellID", "linkedSpellID" }
+local hookedViewerItems = {}
+
+function BuffTracker:ViewerItemMatches(info)
+    if type(info) ~= "table" or ns.IsSecret(info) then return false end
+    for _, field in ipairs(VIEWER_SPELL_FIELDS) do
+        local id = Plain(info[field])
+        if id and self.isID[id] then return true end
+    end
+    local linked = Plain(info.linkedSpellIDs)
+    if type(linked) == "table" then
+        for _, id in ipairs(linked) do
+            if Plain(id) and self.isID[id] then return true end
+        end
+    end
+    return false
+end
+
+-- true / false from the Cooldown Manager, or nil when it doesn't track the buff.
+function BuffTracker:FindInCooldownViewer()
+    local state
+    for _, name in ipairs(VIEWERS) do
+        local pool = type(_G[name]) == "table" and _G[name].itemFramePool
+        if type(pool) == "table" and type(pool.EnumerateActive) == "function" then
+            for item in pool:EnumerateActive() do
+                if not hookedViewerItems[item] and type(item.OnActiveStateChanged) == "function" then
+                    hookedViewerItems[item] = true
+                    hooksecurefunc(item, "OnActiveStateChanged", function() ns.Trace("CDM item active changed"); ns:ScheduleUpdate() end)
+                end
+                if item.cooldownID and self:ViewerItemMatches(item.cooldownInfo) then
+                    local active = item.isActive
+                    if not ns.IsSecret(active) and type(active) == "boolean" then
+                        if active then return true end
+                        state = false
+                    end
+                end
+            end
+        end
+    end
+    return state
+end
+
+-- Read() with the source of the answer traced when the state changes.
+function BuffTracker:Read()
+    local before = self.has
+    self.src = "kept"
+    local has = self:ReadState()
+    if has ~= before then
+        ns.Trace("%s: %s -> %s via %s", self.name or "buff", tostring(before), tostring(has), self.src)
+    end
+    return has
+end
+
+function BuffTracker:ReadState()
+    local aura = ns.PlayerAura(self.ids)
+    if aura ~= nil then self.src = "aura API" end
+    if aura == nil then
+        aura = self:FindInBuffFrame()
+        if aura ~= nil then self.src = "buff frame" end
+    end
+    if aura == nil then
+        -- The buff frame can't tell (a buff cast in combat has a hidden entry): the Cooldown Manager
+        -- knows it by spell. It updates a moment after the buff frame, so it comes second, and right
+        -- after our cast its stale "inactive" is ignored.
+        local ok, active = pcall(self.FindInCooldownViewer, self)
+        -- Right after our cast it may still say "inactive" until it picks the new aura up; once it
+        -- has shown it active, "inactive" is a real removal and applies at once.
+        if ok and active == false and self.castAt and not self.viewerSawCast
+            and GetTime() - self.castAt < CAST_GRACE then
+            active = nil
+        end
+        if ok and active ~= nil then
+            self.src = "cooldown manager"
+            if active then
+                self.has, self.prevInstance, self.viewerSawCast = true, nil, true
+            else
+                self.has, self.instance, self.expires, self.castAt = false, nil, nil, nil
+            end
+            return self.has
+        end
+    end
+    if aura then
+        self.has, self.castAt, self.prevInstance = true, nil, nil
+        local id, exp, tex = aura.auraInstanceID, aura.expirationTime, aura.icon or aura.texture
+        self.instance = Plain(id)
+        exp = Plain(exp)
+        self.expires = exp and exp > 0 and exp or nil
+        if Plain(tex) then self.icons[tex] = true end
+    elseif aura == false then
+        self.has, self.instance, self.expires = false, nil, nil
+    elseif self.has then
+        if ns.AuraInstanceExists("player", self.instance) == false
+            or (self.expires and GetTime() >= self.expires) then
+            self.has = false
+            self.src = "instance / end time"
+        end
+    end
+    return self.has
+end
+
+-- ids: spell IDs of the buff; duration: seconds, used when it's cast in combat.
+function ns.NewBuffTracker(ids, duration, name)
+    local isID = {}
+    for _, id in ipairs(ids) do isID[id] = true end
+    return Mixin({ ids = ids, isID = isID, duration = duration, icons = {}, name = name }, BuffTracker)
 end
 
 function ns.AurasSecret()
@@ -307,6 +609,16 @@ ns:RegisterEvent("PLAYER_LOGIN", function()
     if ns.InitOptions then ns.InitOptions() end
     ns:ApplyAll()
     C_Timer.NewTicker(1, function() ns:UpdateAll() end)
+    -- The game's buff frame updates on every player aura change, also in combat when addons
+    -- get no aura data: refresh right after it.
+    if BuffFrame and BuffFrame.UpdateAuras then
+        hooksecurefunc(BuffFrame, "UpdateAuras", function() ns.Trace("BuffFrame updated"); ns:ScheduleUpdate() end)
+    end
+    ns:RegisterEvent("UNIT_AURA", function(_, unit)
+        if ns.IsSecret(unit) or unit ~= "player" then return end
+        ns.Trace("UNIT_AURA player")
+        ns:ScheduleUpdate()
+    end)
 end)
 
 ns:RegisterEvent("PLAYER_ENTERING_WORLD", function()
@@ -378,6 +690,11 @@ SlashCmdList.WARLOCKTOOLKIT = function(msg)
         ns.Print("preview %s.", ns.db.preview and "on" or "off")
     elseif msg == "combat" then
         ns:TogglePreviewCombat()
+    elseif msg == "auras" then
+        if ns.DebugAuras then
+            local ok, err = pcall(ns.DebugAuras)
+            if not ok then ns.Print("auras debug failed: %s", tostring(err)) end
+        end
     elseif msg == "reset" then
         if InCombatLockdown() then ns.Print("cannot reset in combat."); return end
         ns:ResetDB(); ns.Print("settings reset.")

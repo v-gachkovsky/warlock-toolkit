@@ -105,8 +105,10 @@ ln -s "$PWD/WarlockToolkit" "/Applications/World of Warcraft/_forever_/Interface
 
 ### 1. Armor
 
-The icon appears when you have neither Demon Skin nor Demon Armor. Clicking it casts Demon Armor,
-or Demon Skin if you haven't learned Demon Armor yet.
+The icon appears when you have neither Demon Skin, Demon Armor nor Fel Armor. Clicking it casts your
+strongest armor: Fel Armor once learned (TBC), otherwise Demon Armor, or Demon Skin before that.
+It works the same in combat: the icon shows up as soon as the buff is removed, dispelled or expires,
+and disappears when you recast it (see [Client limitations](#client-limitations)).
 
 ### 2. Soul Shards
 
@@ -120,8 +122,9 @@ since a shard has no action.
 - **spare** shards (configurable, 1 by default);
 - optionally **Ritual of Summoning**.
 
-The counter exists only on clients with Soul Shard items (Forever, Classic Era, TBC). In Mists and Retail shards
-are a resource shown by the game itself.
+The counter appears once you've learned something that spends shards (a demon that costs one or a stone
+spell), so low-level characters don't get a "low shards" alert. It exists only on clients with Soul Shard
+items (Forever, Classic Era, TBC); in Mists and Retail shards are a resource shown by the game itself.
 
 The highlight threshold equals the recommended amount by default, but you can set it manually.
 
@@ -143,7 +146,9 @@ The icon appears when there's no Healthstone in your bags. Clicking it creates t
 
 If the Soulstone is on the caster, only the timer with the icon is shown, without a name (this can be turned off).
 
-The label's font, size, outline, icon and background opacity are all configurable.
+The label's font, size, outline, icon and background opacity are all configurable. In preview mode the
+label shows your current target's name in class color (or only the timer without a target) with a fast
+running timer, so you can see and place it.
 
 **Timer zones.** The timer changes color as the Soulstone runs low:
 
@@ -204,11 +209,12 @@ These General settings apply to the icons, the shard counter and the Soulstone l
 |--------|---------|-------------|
 | Out-of-combat opacity | 100% | Fully opaque |
 | In-combat opacity | 100% | Can't go below 20%, so nearly invisible icons don't steal clicks |
-| *Hide icons in combat* | off | Hides the icons for the whole fight |
-| *Click-through in combat* | off | In combat all addon elements ignore the mouse, so you can click targets and turn the camera through them. They become clickable again out of combat |
+| *Hide icons in combat* | off | Hides the icons for the whole fight. Turned on mid-fight, it applies at once |
+| *Click-through in combat* | off | In combat all addon elements ignore the mouse, so you can click targets and turn the camera through them. With it off, icons are clickable in combat, also those that show up mid-fight |
 
 > [!TIP]
-> If you change *Click-through in combat* mid-fight, it takes effect from the next fight.
+> If you change *Click-through in combat* mid-fight, the shard counter and the Soulstone label follow at once,
+> the icons from the next fight (the game locks their mouse input in combat).
 
 ### Snapping
 
@@ -253,13 +259,15 @@ The shard counter and the Soulstone label have a background opacity setting from
 | `/wlt` | Opens the settings (also available under *Options → AddOns*) |
 | `/wlt lock` | Locks all elements |
 | `/wlt unlock` | Unlocks all elements |
-| `/wlt preview` | Shows all icons so you can position them |
+| `/wlt preview` | Shows all icons so you can position them, including spells not learned yet |
 | `/wlt combat` | Toggles combat simulation |
 | `/wlt reset` | Resets the settings |
+| `/wlt auras` | Prints diagnostics of your buffs and recent aura events (useful for bug reports) |
 
-**Combat simulation** lets you see out of combat how everything will behave in combat: opacity, highlight,
-hidden icons and click-through, if enabled. With click-through on, icons can't be moved or clicked
-until the simulation is turned off. The minimap button stays clickable.
+**Combat simulation** lets you see out of combat exactly how everything behaves in a fight: opacity,
+highlight, hidden icons and click-through. Icons that aren't needed stay in place invisible, as in combat.
+With click-through on, icons can't be moved or clicked until the simulation is turned off.
+The minimap button stays clickable.
 
 ### Minimap button
 
@@ -283,19 +291,31 @@ The button can be dragged around the minimap, locked, or hidden in the settings.
 
 ## Client limitations
 
-**Secure buttons in combat.** In combat, secure buttons can't be shown, hidden, moved or changed.
-So everything is decided the moment combat starts:
+**Secure buttons in combat.** In combat, secure buttons can't be shown, hidden, moved or changed,
+and their mouse input can't be switched. The addon works around it with opacity:
 
-- icons visible at the start of combat stay visible and clickable until it ends. If the need goes away
-  (say, your armor is already up), only the highlight fades;
-- icons not needed at the start of combat are invisible and ignore the mouse, so they don't steal clicks.
-  If such an icon becomes needed mid-fight, it shows up as a reminder but only becomes clickable after combat;
-- settings changed in combat are applied after combat.
+- icons appear and disappear in combat just like out of combat (only *Hide icons in combat* hides them all);
+- icons are clickable in combat, also those that appear mid-fight; *Click-through in combat* makes all of
+  them let clicks through instead. Since mouse input is fixed for the whole fight, a faded-out icon still
+  takes clicks at its spot unless click-through is on;
+- icon size, position, lock and click-through changed in combat apply after combat; opacity, highlight
+  and hiding apply at once.
 
-**Hidden auras (secret values).** WoW Forever may hide auras in combat. The addon then keeps the last known state:
+**Hidden auras (secret values).** WoW Forever closes the aura API to addons in combat. The addon then reads
+your buffs from the game's own frames, which keep working:
 
-- after casting Demon Armor the state updates immediately;
-- the Soulstone target and timer are tracked from your own cast and refined by scanning the group out of combat.
+- **Cooldown Manager** (recommended): add Demon Skin / Demon Armor / Fel Armor to its tracked buffs and
+  their state is read by spell, exact in every case;
+- **buff frame** (always): a buff cast in combat hides the icon from the cast, and a removed buff shows the
+  icon at once while your buffs stay readable. But on any buff change in combat the game hides all buff
+  entries from addons; from then on the buff frame can't tell which buff is gone, and without the
+  Cooldown Manager the icon appears only after the fight or when the buff's time runs out.
+  It never shows the icon while the buff is on: food buffs and buffs from other players are never taken
+  for yours.
+
+This covers armor, Grimoire of Sacrifice and a Soulstone on yourself. A Soulstone on another player comes
+from your cast and timer; a used or removed one is noticed when they're visible. Bag items (Healthstone,
+Soulstone, Soul Shards) and the demon are always readable.
 
 **Spell and item IDs** come from Classic Era and later clients (`Data.lua`). If they differ in Forever, the addon tries to find
 the spell by name. New stones or ranks can be added to `Data.lua`.

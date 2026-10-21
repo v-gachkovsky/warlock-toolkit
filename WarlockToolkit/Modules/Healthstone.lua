@@ -19,15 +19,19 @@ function M:Update()
     local b = self.button
     local spell, rank = ns.HighestKnown(ranks)
     if not spell then
-        b:SetAction(nil)
+        local item = ranks[1].items[1]
+        b:SetUnlearned(ns.ItemIcon(item), nil, item)
         b:SetState(nil)
         return
     end
     b:SetSpell(spell, ns.ItemIcon(ranks[rank].items[1]))
 
-    local have = false
+    local have, unknown = false, false
     for _, item in ipairs(allItems) do
-        if ns.ItemCount(item) > 0 then have = true; break end
+        local n = ns.ItemCount(item)
+        if n == nil then unknown = true elseif n > 0 then have = true; break end
     end
+    if not have and unknown then have = self.lastHave end -- bags unreadable: keep last known
+    self.lastHave = have
     b:SetState(not have and "missing" or nil)
 end

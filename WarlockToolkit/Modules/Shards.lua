@@ -54,7 +54,7 @@ function M:Init()
 
     ns.MakeMovable(f, Cfg)
     f:SetScript("OnEnter", function(self)
-        local count = ns.ItemCount(D.SOUL_SHARD)
+        local count = ns.ItemCount(D.SOUL_SHARD) or M.lastCount or 0
         local desired, parts = M:Desired()
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:AddLine("Soul Shards", 0.58, 0.51, 0.79)
@@ -91,10 +91,12 @@ function M:Update()
         return
     end
 
-    local count = ns.ItemCount(D.SOUL_SHARD)
+    -- Bags unreadable (secret in combat): keep the last known count.
+    local count = ns.ItemCount(D.SOUL_SHARD) or self.lastCount or 0
+    self.lastCount = count
     local desired, parts = self:Desired()
-    -- Nothing learned that spends shards yet (low level): no counter and no "low" alert.
-    if #parts == 0 and not ns.db.preview then
+    -- No Drain Soul yet (low level): no shards to count, so no counter and no "low" alert.
+    if not ns.HighestKnown(D.drainSoul) and not ns.db.preview then
         f:Hide()
         self.low = nil
         return

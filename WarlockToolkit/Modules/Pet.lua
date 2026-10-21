@@ -11,6 +11,11 @@ M.SLOTS = {
     { key = "meta",  prefix = "meta-",  text = "Cmd + Click", mac = true },
 }
 
+-- Grimoire of Sacrifice: no demon on purpose (followed through combat like the armor buff).
+local sacrifice = ns.NewBuffTracker(D.petSacrificeBuffs, nil, "sacrifice")
+local isSacrifice = {}
+for _, id in ipairs(D.petSacrificeBuffs) do isSacrifice[id] = true end
+
 local demonByKey = {}
 for _, d in ipairs(D.demons) do demonByKey[d.key] = d end
 
@@ -69,7 +74,17 @@ function M:Init()
         end
     end
     ns:RegisterEvent("UNIT_PET", function(_, unit) if unit == "player" then M:Update() end end)
-    ns:RegisterEvent("UNIT_AURA", function(_, unit) if unit == "player" then M:Update() end end)
+    ns:RegisterEvent("UNIT_AURA", function(_, unit, info)
+        if ns.IsSecret(unit) or unit ~= "player" then return end
+        sacrifice:OnAuraUpdate(info)
+        M:Update()
+    end)
+    ns:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED", function(_, unit, _, spellID)
+        if unit == "player" and not ns.IsSecret(spellID) and isSacrifice[spellID] then
+            sacrifice:Cast()
+            M:Update()
+        end
+    end)
     ns:RegisterEvent("MODIFIER_STATE_CHANGED", function() M:UpdateModifierIcon() end)
 end
 
@@ -80,7 +95,8 @@ function M:Update()
     local bindings = ns.db.pet.bindings
     local defaultSpell = DemonSpell(bindings.none) or DemonSpell("imp")
     if not defaultSpell then
-        b:SetAction(nil)
+        local sample = demonByKey.imp.spell
+        b:SetUnlearned(ns.SpellTexture(sample), sample)
         b:SetState(nil)
         return
     end
@@ -96,13 +112,17 @@ function M:Update()
     end
     b:SetAction(attrs, ns.SpellTexture(defaultSpell), defaultSpell)
 
-    local hasPet = UnitExists("pet") and not UnitIsDead("pet")
+    -- Pet state can be secret in combat: then keep the last known one.
+    local exists, dead = ns.Bool(UnitExists, "pet"), ns.Bool(UnitIsDead, "pet")
+    local hasPet
+    if exists == nil or (exists and dead == nil) then
+        hasPet = self.lastHasPet
+    else
+        hasPet = exists and not dead
+    end
+    self.lastHasPet = hasPet
     if not hasPet then
-        -- Grimoire of Sacrifice: no demon on purpose. Keep the last known state while auras are unreadable.
-        local sacrificed = ns.PlayerHasAura(D.petSacrificeBuffs)
-        if sacrificed == nil then sacrificed = self.lastSacrificed end
-        self.lastSacrificed = sacrificed
-        hasPet = sacrificed
+        hasPet = sacrifice:Read() == true
     end
     b:SetState(not hasPet and "missing" or nil)
     self:UpdateModifierIcon()

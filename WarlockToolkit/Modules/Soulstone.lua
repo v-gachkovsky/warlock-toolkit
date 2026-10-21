@@ -9,6 +9,11 @@ local pendingCasts = {}
 
 local function LabelCfg() return ns.db.soulstoneLabel end
 
+-- Soulstone on the caster, followed through combat like the armor buff.
+local selfStone = ns.NewBuffTracker(D.soulstoneBuffs, nil, "soulstone")
+-- Raid members get no UNIT_AURA here (see Core): rescan them this often out of combat.
+local RAID_SCAN_PERIOD = 3
+
 -- Timer zone by seconds left: "crit", "warn" or nil.
 local function TimerZone(remain)
     local z = ns.db.soulstoneLabel.zones
@@ -81,9 +86,17 @@ local function UnitByFullName(name)
     end
 end
 
-local function UnitByGUID(guid)
+-- Group plus target and focus: the Soulstone may be on a player outside the group.
+local function ScanUnits()
+    local units = GroupUnits()
+    units[#units + 1] = "target"
+    units[#units + 1] = "focus"
+    return units
+end
+
+local function UnitByGUID(guid, units)
     if not guid then return nil end
-    for _, u in ipairs(GroupUnits()) do
+    for _, u in ipairs(units or GroupUnits()) do
         if GUIDOf(u) == guid then return u end
     end
 end
@@ -117,9 +130,20 @@ function M:GetTracked()
 end
 
 -- full: "Name" / "Name-Realm", kept only as a fallback when the GUID is unknown.
-function M:SetTracked(guid, name, class, expires, full)
+-- instance: the aura instance ID once seen, so its removal can be noticed in combat.
+function M:SetTracked(guid, name, class, expires, full, instance)
     if not guid and not name then ns.cdb.soulstone = nil; return end
-    ns.cdb.soulstone = { guid = guid, name = name, full = full, class = class, expires = expires }
+    ns.cdb.soulstone = { guid = guid, name = name, full = full, class = class, expires = expires, instance = instance }
+end
+
+-- In combat the Soulstone aura is secret, but its remembered instance still shows whether
+-- it's gone (used or removed). Only for a visible unit: hidden ones read as "no aura" too.
+function M:CheckInstance()
+    local t = self:GetTracked()
+    if not t or not t.instance then return end
+    local u = UnitByGUID(t.guid, ScanUnits())
+    if not u or not ns.Bool(UnitIsVisible, u) or not ns.Bool(UnitIsConnected, u) then return end
+    if ns.AuraInstanceExists(u, t.instance) == false then self:SetTracked(nil) end
 end
 
 local function IsSelf(t)
@@ -131,11 +155,7 @@ end
 function M:Scan()
     if ns.AurasSecret() or not C_UnitAuras or not C_UnitAuras.GetAuraDataByIndex then return end
     local found
-    -- Target and focus too: the Soulstone may be on a player outside the group.
-    local units = GroupUnits()
-    units[#units + 1] = "target"
-    units[#units + 1] = "focus"
-    for _, u in ipairs(units) do
+    for _, u in ipairs(ScanUnits()) do
         if UnitExists(u) then
             local ok = pcall(function()
                 for i = 1, 40 do
@@ -157,7 +177,9 @@ function M:Scan()
             local t = self:GetTracked()
             expires = t and t.expires or GetServerTime() + Duration()
         end
-        self:SetTracked(GUIDOf(found.unit), ShortName(UnitName(found.unit)), ClassOf(found.unit), expires)
+        local id = a.auraInstanceID
+        self:SetTracked(GUIDOf(found.unit), ShortName(UnitName(found.unit)), ClassOf(found.unit), expires, nil,
+            not ns.IsSecret(id) and id or nil)
         return
     end
 
@@ -296,6 +318,7 @@ function M:Init()
         local key = Safe(castGUID) or "last"
         local info = pendingCasts[key] or Snapshot(IntendedUnit())
         pendingCasts[key] = nil
+        if info.guid and info.guid == GUIDOf("player") then selfStone:Cast() end
         M:SetTracked(info.guid, info.name or UnitName("player"), info.class or ClassOfGUID(info.guid),
             GetServerTime() + Duration(), info.full)
         M:Update()
@@ -306,6 +329,7 @@ function M:Init()
         if ns.db.preview then M:Update() end
     end)
     ns:RegisterEvent("UNIT_AURA", function(_, unit)
+        if ns.IsSecret(unit) then return end
         if unit == "player" or unit == "target" or unit == "focus"
             or (unit and (unit:match("^party") or unit:match("^raid"))) then
             M.needScan = true
@@ -334,10 +358,22 @@ function M:Update()
         return
     end
 
+    if not ns.AurasSecret() and IsInRaid() and self:GetTracked()
+        and GetTime() - (self.lastScan or 0) >= RAID_SCAN_PERIOD then
+        self.needScan = true
+    end
     if self.needScan and not ns.AurasSecret() then
         self.needScan = false
+        self.lastScan = GetTime()
         self:Scan()
+    elseif ns.AurasSecret() then
+        self:CheckInstance()
     end
+    -- On the caster the game's buff frame shows the Soulstone in combat too: gone means used.
+    local wasOn = selfStone.has
+    local onSelf = selfStone:Read()
+    local tracked = self:GetTracked()
+    if wasOn and onSelf == false and tracked and IsSelf(tracked) and ns.AurasSecret() then self:SetTracked(nil) end
 
     local t = self:GetTracked()
     -- The tracked Soulstone ran out (not removed early): optional sound.
@@ -348,7 +384,10 @@ function M:Update()
         if GetServerTime() >= self.lastExpires and ex.sound and ns.ready then ns.PlaySound(ex.soundName) end
         self.lastExpires = nil
     end
-    if t and not IsSelf(t) then
+    -- Before Soulstones can be made (low level) the label shows in preview only.
+    if not ns.db.preview and not (DirectCast() or ns.HighestKnown(ranks)) then
+        self:ShowLabel(nil, nil, nil)
+    elseif t and not IsSelf(t) then
         if not t.class then t.class = ClassOf(UnitByGUID(t.guid)) or ClassOfGUID(t.guid) end
         self:ShowLabel(t.name, t.class, t.expires)
     elseif t then
@@ -375,10 +414,13 @@ function M:Update()
     end
 
     -- State 2: a Soulstone is in the bags but not applied -> use it.
-    local item
+    local item, unknown
     for i = #ranks, 1, -1 do
-        if ns.ItemCount(ranks[i].items[1]) > 0 then item = ranks[i].items[1]; break end
+        local n = ns.ItemCount(ranks[i].items[1])
+        if n == nil then unknown = true elseif n > 0 then item = ranks[i].items[1]; break end
     end
+    if not item and unknown then item = self.lastItem end -- bags unreadable: keep last known
+    self.lastItem = item
 
     if item then
         local macro = string.format("/use [help,nodead] item:%d; [@player] item:%d", item, item)
@@ -392,8 +434,12 @@ function M:Update()
     if spell then
         b:SetSpell(spell, ns.ItemIcon(ranks[rank].items[1]))
         b:SetState((not t or ns.db.soulstone.createWhileApplied) and "create" or nil)
+    elseif ns.SHARD_ITEMS then
+        local sample = ranks[1].items[1]
+        b:SetUnlearned(ns.ItemIcon(sample), nil, sample)
+        b:SetState(nil)
     else
-        b:SetAction(nil)
+        b:SetUnlearned(ns.SpellTexture(D.soulstoneSpell), D.soulstoneSpell)
         b:SetState(nil)
     end
 end

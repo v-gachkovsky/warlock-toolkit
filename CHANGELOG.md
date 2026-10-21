@@ -4,7 +4,33 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/).
 
-## [1.0.1] - Unreleased
+## [1.0.2] - Unreleased
+
+### Added
+- **Preview shows every icon, learned or not** (also with simulated combat), so a low-level character can
+  place and set up all icons in advance. Icons for spells you don't know yet do nothing on click.
+- `/wlt auras`: diagnostics of what the client returns for your buffs, for bug reports.
+
+### Changed
+- Outside preview the Soul Shard counter appears once Drain Soul is learned, and the Soulstone label once
+  you can create Soulstones.
+
+### Fixed
+- **Icons in combat now work like out of combat** (WoW Forever hides auras from addons in combat):
+  - the armor icon no longer shows in combat while Demon Skin / Demon Armor is on;
+  - it appears as soon as the buff is removed, dispelled or expires, and disappears when you recast it,
+    also several times in one fight. Buffs are read from the Cooldown Manager if the buff is tracked there
+    (recommended: exact in every case), otherwise from the game's own buff frame, which can't tell after
+    other buffs change in combat. Food buffs and buffs from other players are never taken for yours;
+  - the same goes for Grimoire of Sacrifice and a Soulstone on yourself; a used or removed Soulstone on
+    another player is noticed when they're visible;
+  - icons appear and disappear during the fight instead of staying until it ends, and are clickable
+    unless "Click-through in combat" is on, also when they show up mid-fight;
+  - "Hide icons in combat" turned on during a fight applies at once; invisible icons show no tooltip.
+- Aura changes reached the addon late or not at all, which delayed the icons and Soulstone tracking.
+- Combat simulation now behaves exactly like a real fight.
+
+## [1.0.1] - 2026-10-21
 
 ### Added
 - Soulstone timer zones: the timer turns yellow at 5 minutes left and red at 1 minute. In the options

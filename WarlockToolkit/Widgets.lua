@@ -523,6 +523,18 @@ function Icon:SetAction(attrs, texture, tipSpell, tipItem)
     self.tipSpell, self.tipItem = tipSpell, tipItem
     self.wantAttrs = attrs
     self.hasAction = attrs ~= nil
+    self.unlearned = nil
+end
+
+-- The spell isn't learned yet: no icon, except in preview, where a sample that does nothing
+-- on click lets the icon be placed and set up in advance.
+function Icon:SetUnlearned(texture, tipSpell, tipItem)
+    if not ns.db.preview then
+        self:SetAction(nil)
+        return
+    end
+    self:SetAction({}, texture, tipSpell, tipItem)
+    self.unlearned = true
 end
 
 function Icon:SetSpell(spellID, texture)
@@ -561,6 +573,7 @@ end
 
 function Icon:SetState(state)
     if state ~= self.state then
+        ns.Trace("icon %s: %s -> %s", self.key, tostring(self.state), tostring(state))
         self.state = state
         if state and ns.ready and self:Cfg().enabled then
             local sc = self:StateCfg(state)
@@ -577,22 +590,25 @@ function Icon:Sync()
     self.glow:SetGlow(show and sc.glow, sc.glowColor, cfg.size)
 
     if InCombatLockdown() then
-        -- Protected frame: only alpha may change in combat. Once an icon has been
-        -- visible during this combat it stays visible (and clickable) until combat ends.
-        if self:IsShown() then
-            if show then self.combatShown = true end
-            self:SetAlpha(self.combatShown and ns.FrameAlpha() or 0)
-        end
+        -- Protected frame: only alpha may change in combat, so the icon shows and hides
+        -- by opacity, the same way as out of combat ("Hide icons in combat" too, if turned on now).
+        if self:IsShown() then self:SetAlpha(show and not ns.db.combat.hide and ns.FrameAlpha() or 0) end
         return
     end
-    self.combatShown = nil
     self:SetSize(cfg.size, cfg.size)
     ns.ApplyDragButton(self)
     ns.ApplyPoint(self, cfg.point)
     self:ApplySecure()
     self:EnableMouse(not ns.ClickThrough())
-    self:SetAlpha(ns.FrameAlpha())
-    self:SetShown(show)
+    if ns.CombatLook() and cfg.enabled and self.hasAction and not ns.db.combat.hide then
+        -- Simulated combat looks and behaves like a real fight: the icon stays in place, invisible
+        -- while not needed (and still taking clicks unless click-through is on).
+        self:SetAlpha(show and ns.FrameAlpha() or 0)
+        self:Show()
+    else
+        self:SetAlpha(ns.FrameAlpha())
+        self:SetShown(show)
+    end
 end
 
 -- Runs right before combat lockdown: the last moment protected frames can be
@@ -601,19 +617,18 @@ function Icon:PrepareForCombat()
     if not self:Cfg().enabled or not self.hasAction then return end
     self:ApplySecure()
     if ns.db.combat.hide then
-        self.combatShown = nil
         self:Hide()
         return
     end
     self:Show()
-    self.combatShown = self:ShouldShow() or nil
-    self:SetAlpha(self.combatShown and ns.FrameAlpha() or 0)
-    -- Icons that start combat invisible never take clicks, so they can't block
-    -- clicks on the world; if they appear later in combat they only indicate.
-    self:EnableMouse(self.combatShown and not ns.ClickThrough() or false)
+    self:SetAlpha(self:ShouldShow() and ns.FrameAlpha() or 0)
+    -- Mouse input can't change in combat, so it's set for the whole fight now: clickable unless
+    -- "Click-through in combat" is on, also for icons that only appear later in the fight.
+    self:EnableMouse(not ns.ClickThrough())
 end
 
 local function Icon_OnEnter(self)
+    if self:GetAlpha() == 0 then return end -- invisible in combat: no tooltip
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     if self.tipItem then
         GameTooltip:SetItemByID(self.tipItem)
@@ -622,7 +637,10 @@ local function Icon_OnEnter(self)
     else
         GameTooltip:AddLine(self.title)
     end
-    if self.hint then
+    if self.unlearned then
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Not learned yet (shown in preview only).", 1, 0.3, 0.3)
+    elseif self.hint then
         GameTooltip:AddLine(" ")
         self.hint(GameTooltip)
     end

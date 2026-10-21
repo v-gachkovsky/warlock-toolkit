@@ -10,6 +10,7 @@ ns.data = {
         demonArmor = { 706, 1086, 11733, 11734, 11735, 27260 },
         demonSkin  = { 687, 696 },
     },
+    armorDuration = 1800, -- all three last 30 minutes
 
     -- Demons the Pet icon can summon. `shard` = costs a Soul Shard.
     -- `list` holds replacements, last learned wins: Grimoire of Supremacy (Mists), Sayaad (Retail).
@@ -25,6 +26,9 @@ ns.data = {
 
     -- Grimoire of Sacrifice buff (Mists, Retail): the demon is sacrificed on purpose.
     petSacrificeBuffs = { 108503, 196099 },
+
+    -- The counter shows once Soul Shards can be gained.
+    drainSoul = { 1120, 8288, 8289, 11675, 27217 },
 
     ritualOfSummoning = 698,
 
