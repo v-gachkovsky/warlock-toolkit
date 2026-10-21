@@ -29,6 +29,7 @@
   - [Opacity and combat](#opacity-and-combat)
   - [Snapping](#snapping)
   - [Background](#background)
+  - [Sounds](#sounds)
 - [Controls](#controls)
   - [Commands](#commands)
   - [Minimap button](#minimap-button)
@@ -144,6 +145,18 @@ If the Soulstone is on the caster, only the timer with the icon is shown, withou
 
 The label's font, size, outline, icon and background opacity are all configurable.
 
+**Timer zones.** The timer changes color as the Soulstone runs low:
+
+| Zone | Default | Configurable |
+|------|---------|--------------|
+| Normal | white | color |
+| Warning | yellow from 5:00 left | on/off, start time, color, sound when it starts |
+| Critical | red from 1:00 left | on/off, start time, color, sound when it starts |
+| Ran out | — | sound when the timer reaches zero |
+
+The critical zone wins where the zones overlap. Sounds are off by default. In preview mode the timer runs faster (300x by default, adjustable from 1x to 600x)
+and the sounds play on every cycle, so you can hear them.
+
 ### 5. Demon
 
 The demon icon appears when you have no pet. Each click variant can be bound to its own demon:
@@ -212,6 +225,20 @@ This makes it easy to arrange elements into rows and columns.
 | Snapping | on |
 | Snap distance | 10 |
 | Gap between elements | 2 |
+
+### Sounds
+
+Every alert can play a sound. The list has 14 game sounds, sounds from
+[LibSharedMedia](https://www.curseforge.com/wow/addons/libsharedmedia-3-0) if another addon provides it,
+and your own files:
+
+1. Put `.ogg` or `.mp3` files into `World of Warcraft/<client>/Interface/WarlockToolkitSounds/`.
+   The folder is outside the addon, so updates don't delete your files.
+2. Fully restart the game: `/reload` doesn't see new files.
+3. In **Custom sounds**, enter the file name (`alarm.ogg`) or a full path starting with `Interface\`
+   and press **Add**. The file appears in every Sound list.
+
+**Test** next to each list plays the sound and tells you if a file can't be played.
 
 ### Background
 

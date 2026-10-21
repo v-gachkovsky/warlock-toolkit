@@ -9,6 +9,13 @@ local pendingCasts = {}
 
 local function LabelCfg() return ns.db.soulstoneLabel end
 
+-- Timer zone by seconds left: "crit", "warn" or nil.
+local function TimerZone(remain)
+    local z = ns.db.soulstoneLabel.zones
+    if z.crit.enabled and remain <= z.crit.seconds then return "crit" end
+    if z.warn.enabled and remain <= z.warn.seconds then return "warn" end
+end
+
 -- Mists / Retail: Soulstone is a spell cast on the target instead of a bag item.
 local function DirectCast() return ns.IsKnown(D.soulstoneSpell) end
 
@@ -50,6 +57,22 @@ local function GroupUnits()
     return units
 end
 
+-- false for errors and secret values.
+local function Check(fn, ...)
+    local ok, v = pcall(fn, ...)
+    return ok and not ns.IsSecret(v) and v or false
+end
+
+-- Where the cast goes when the event doesn't name a target: the friendly living
+-- target, as in the icon's [help,nodead] macro, otherwise the caster.
+local function IntendedUnit()
+    if Check(UnitExists, "target") and Check(UnitCanAssist, "player", "target")
+        and not Check(UnitIsDeadOrGhost, "target") then
+        return "target"
+    end
+    return "player"
+end
+
 local function UnitByFullName(name)
     if not name then return nil end
     name = name:gsub("%s", "")
@@ -77,6 +100,12 @@ local function ClassOfGUID(guid)
     if ok then return Safe(class) end
 end
 
+-- Who a Soulstone cast is for, read while the unit is still targeted.
+local function Snapshot(unit)
+    local ok, name = pcall(UnitName, unit)
+    return { guid = GUIDOf(unit), name = ShortName(ok and name or nil), full = FullName(unit), class = ClassOf(unit) }
+end
+
 ------------------------------------------------------------------------
 -- Tracking (persisted per character so it survives /reload).
 -- The target is identified by GUID; the name is only for display.
@@ -102,7 +131,11 @@ end
 function M:Scan()
     if ns.AurasSecret() or not C_UnitAuras or not C_UnitAuras.GetAuraDataByIndex then return end
     local found
-    for _, u in ipairs(GroupUnits()) do
+    -- Target and focus too: the Soulstone may be on a player outside the group.
+    local units = GroupUnits()
+    units[#units + 1] = "target"
+    units[#units + 1] = "focus"
+    for _, u in ipairs(units) do
         if UnitExists(u) then
             local ok = pcall(function()
                 for i = 1, 40 do
@@ -158,10 +191,37 @@ function M:CreateLabel()
     local elapsed = 0
     f:SetScript("OnUpdate", function(self, dt)
         elapsed = elapsed + dt
-        if elapsed < 0.25 then return end
+        -- The fast preview timer needs frequent ticks, or it would jump over the zones.
+        if elapsed < (self.previewStart and 0.05 or 0.25) then return end
         elapsed = 0
-        local remain = (self.expires or 0) - GetServerTime()
+        local remain
+        if self.previewStart then
+            -- Preview: counts down fast and restarts from the full duration at 0.
+            local d = self.previewDuration
+            remain = d - math.floor((GetTime() - self.previewStart) * LabelCfg().previewSpeed) % d
+        else
+            remain = (self.expires or 0) - GetServerTime()
+        end
         if remain < 0 then remain = 0 end
+        local cfg = LabelCfg()
+        local zone = TimerZone(remain)
+        local c = zone and cfg.zones[zone].color or cfg.timerColor
+        self.timer:SetTextColor(c[1], c[2], c[3])
+        -- Sounds when a zone starts and when the timer runs out. A new Soulstone (or preview)
+        -- starts silently in its current zone.
+        local key = self.previewStart or self.expires
+        if self.zoneFor ~= key then
+            self.zoneFor, self.zone = key, zone
+        elseif ns.ready then
+            if self.previewStart and remain > self.lastRemain and cfg.expired.sound then
+                ns.PlaySound(cfg.expired.soundName) -- the preview sample ran out and restarted
+            end
+            if zone ~= self.zone then
+                local zc = zone and cfg.zones[zone]
+                if zc and zc.sound then ns.PlaySound(zc.soundName) end
+            end
+        end
+        self.zone, self.lastRemain = zone, remain
         self.timer:SetFormattedText("%d:%02d", math.floor(remain / 60), remain % 60)
     end)
     f:Hide()
@@ -169,9 +229,16 @@ function M:CreateLabel()
 end
 
 -- name == nil with `expires` set: Soulstone is on the caster, show only the timer.
-function M:ShowLabel(name, class, expires)
+-- preview: a sample with a fast running timer instead of a real one.
+function M:ShowLabel(name, class, expires, preview)
     local f, cfg = self.label, LabelCfg()
-    if not expires or not cfg.enabled then f:Hide(); return end
+    if not expires or not cfg.enabled then f:Hide(); f.previewStart = nil; return end
+    if preview then
+        f.previewDuration = Duration()
+        f.previewStart = f.previewStart or GetTime()
+    else
+        f.previewStart = nil
+    end
     local iconSize = cfg.timerSize + 2
     local nameHeight = 0
     if name then
@@ -181,7 +248,6 @@ function M:ShowLabel(name, class, expires)
         nameHeight = cfg.nameSize + 2
     end
     f.name:SetShown(name ~= nil)
-    f.timer:SetTextColor(1, 1, 1)
     f.timer:ClearAllPoints()
     f.timer:SetPoint("TOP", f, "TOP", cfg.showIcon and (iconSize + 3) / 2 or 0, -(nameHeight + 3))
     f.expires = expires
@@ -210,24 +276,38 @@ function M:Init()
     end
     self:CreateLabel()
 
+    -- The target name in UNIT_SPELLCAST_SENT can be empty or secret (newer clients):
+    -- then the cast goes to the friendly target, or to the caster.
     ns:RegisterEvent("UNIT_SPELLCAST_SENT", function(_, unit, target, castGUID, spellID)
         if unit ~= "player" or ns.IsSecret(spellID) or not isBuff[spellID] then return end
-        pendingCasts[castGUID] = Safe(target) or false
+        local name = Safe(target)
+        local info
+        if name then
+            local u = UnitByFullName(name)
+            if not u and FullName("target") == (name:gsub("%s", "")) then u = "target" end
+            info = u and Snapshot(u) or { name = ShortName(name), full = name }
+        else
+            info = Snapshot(IntendedUnit())
+        end
+        pendingCasts[Safe(castGUID) or "last"] = info
     end)
     ns:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED", function(_, unit, castGUID, spellID)
         if unit ~= "player" or ns.IsSecret(spellID) or not isBuff[spellID] then return end
-        local target = pendingCasts[castGUID]
-        pendingCasts[castGUID] = nil
-        -- No target name means the stone went on the caster.
-        local u = target and UnitByFullName(target) or "player"
-        local guid = u and GUIDOf(u)
-        M:SetTracked(guid, ShortName(target) or UnitName("player"), u and ClassOf(u) or ClassOfGUID(guid),
-            GetServerTime() + Duration(), target)
+        local key = Safe(castGUID) or "last"
+        local info = pendingCasts[key] or Snapshot(IntendedUnit())
+        pendingCasts[key] = nil
+        M:SetTracked(info.guid, info.name or UnitName("player"), info.class or ClassOfGUID(info.guid),
+            GetServerTime() + Duration(), info.full)
         M:Update()
     end)
     ns:RegisterEvent("GROUP_ROSTER_UPDATE", function() M:Update() end)
+    ns:RegisterEvent("PLAYER_TARGET_CHANGED", function()
+        M.needScan = true
+        if ns.db.preview then M:Update() end
+    end)
     ns:RegisterEvent("UNIT_AURA", function(_, unit)
-        if unit == "player" or (unit and (unit:match("^party") or unit:match("^raid"))) then
+        if unit == "player" or unit == "target" or unit == "focus"
+            or (unit and (unit:match("^party") or unit:match("^raid"))) then
             M.needScan = true
         end
     end)
@@ -236,7 +316,7 @@ end
 
 function M:ApplySettings()
     local cfg, f = LabelCfg(), self.label
-    ns.ApplyFont(f.name, cfg.font, cfg.nameSize, cfg.outline)
+    ns.ApplyNameFont(f.name, cfg.font, cfg.nameSize, cfg.outline)
     ns.ApplyFont(f.timer, cfg.font, cfg.timerSize, cfg.outline)
     -- Small Soulstone icon left of the timer; shift the timer so the pair stays centered.
     local iconSize = cfg.timerSize + 2
@@ -260,14 +340,28 @@ function M:Update()
     end
 
     local t = self:GetTracked()
+    -- The tracked Soulstone ran out (not removed early): optional sound.
+    if t then
+        self.lastExpires = t.expires
+    elseif self.lastExpires then
+        local ex = LabelCfg().expired
+        if GetServerTime() >= self.lastExpires and ex.sound and ns.ready then ns.PlaySound(ex.soundName) end
+        self.lastExpires = nil
+    end
     if t and not IsSelf(t) then
         if not t.class then t.class = ClassOf(UnitByGUID(t.guid)) or ClassOfGUID(t.guid) end
         self:ShowLabel(t.name, t.class, t.expires)
     elseif t then
         self:ShowLabel(nil, nil, LabelCfg().showSelf and t.expires or nil)
     elseif ns.db.preview then
-        local _, class = UnitClass("player")
-        self:ShowLabel("Soulstone target", class, GetServerTime() + Duration())
+        -- As if cast now: on the current target, or on yourself without one (timer only).
+        local expires = GetServerTime() + Duration()
+        if Check(UnitExists, "target") and not Check(UnitIsUnit, "target", "player") then
+            local s = Snapshot("target")
+            self:ShowLabel(s.name or "Soulstone target", s.class, expires, true)
+        else
+            self:ShowLabel(nil, nil, LabelCfg().showSelf and expires or nil, true)
+        end
     else
         self:ShowLabel(nil, nil, nil)
     end

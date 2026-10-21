@@ -176,12 +176,34 @@ end
 ------------------------------------------------------------------------
 local function T(key) return function() return ns.db[key] end end
 
+local function TestSound(value)
+    if not ns.PlaySound(value) then
+        ns.Print("can't play %s. Custom files need a full game restart after adding them.", tostring(value))
+    end
+end
+
+local function SoundRows(getTbl, soundText)
+    Check(soundText or "Play sound", function() return getTbl().sound end, function(v) getTbl().sound = v end)
+    Cycle("Sound", ns.GetSoundList, function() return getTbl().soundName end, function(v) getTbl().soundName = v end,
+        { text = "Test", onClick = function() TestSound(getTbl().soundName) end })
+end
+
+local function Input(text, width, onEnter)
+    Label(text)
+    local e = CreateFrame("EditBox", nil, content, "InputBoxTemplate")
+    e:SetSize(width, 20)
+    e:SetPoint("TOPLEFT", RIGHT + 6, y + 3)
+    e:SetAutoFocus(false)
+    e:SetScript("OnEnterPressed", function(self) onEnter(self:GetText()); self:ClearFocus() end)
+    e:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    y = y - 28
+    return e
+end
+
 local function GlowAndSound(getTbl, glowText, soundText)
     Check(glowText or "Highlight (glow)", function() return getTbl().glow end, function(v) getTbl().glow = v end)
     Color("Highlight color", function() return getTbl().glowColor end, function(v) getTbl().glowColor = v end)
-    Check(soundText or "Play sound", function() return getTbl().sound end, function(v) getTbl().sound = v end)
-    Cycle("Sound", ns.SOUNDS, function() return getTbl().soundName end, function(v) getTbl().soundName = v end,
-        { text = "Test", onClick = function() ns.PlaySound(getTbl().soundName) end })
+    SoundRows(getTbl, soundText)
 end
 
 local function IconSection(title, key, extra)
@@ -273,8 +295,51 @@ local function Build()
         "If a modifier is used for moving, clicks with that modifier do nothing while the icon is unlocked. " ..
         "Labels and the shard counter are moved with left-drag. Changes made in combat apply after combat.")
 
+    -- Custom sounds: the player's own files, offered in every sound list.
+    Header("Custom sounds")
+    Note("Put .ogg or .mp3 files into World of Warcraft/<client>/Interface/WarlockToolkitSounds/ and fully restart " ..
+        "the game (a /reload doesn't find new files). Then add each file here by its name, e.g. alarm.ogg, " ..
+        "or by a full path starting with Interface\\. Added files appear in every Sound list.")
+    local function AddSound(text)
+        local path = ns.NormalizeSoundPath(text)
+        if not path then return end
+        for _, c in ipairs(ns.db.customSounds) do
+            if c.path:lower() == path:lower() then ns.Print("already added: %s", path); return end
+        end
+        local name = path:match("([^\\]+)$"):gsub("%.%w+$", "")
+        table.insert(ns.db.customSounds, { name = name, path = path })
+        if not ns.PlaySound(path) then
+            ns.Print("added %s, but it can't be played yet: check the name or restart the game.", path)
+        end
+        Changed()
+    end
+    local input = Input("Sound file", 170, function(text) AddSound(text) end)
+    local add = Button("Add", 60, function() AddSound(input:GetText()); input:SetText(""); input:ClearFocus() end)
+    add:ClearAllPoints()
+    add:SetPoint("LEFT", input, "RIGHT", 6, 0)
+    local selected
+    local function CustomList()
+        local list = {}
+        for _, c in ipairs(ns.db.customSounds) do list[#list + 1] = { value = c.path, text = c.name } end
+        if #list == 0 then list[1] = { value = "", text = "(none)" } end
+        return list
+    end
+    Cycle("Added files", CustomList, function() return selected or CustomList()[1].value end, function(v) selected = v end,
+        { text = "Test", onClick = function() local v = selected or CustomList()[1].value; if v ~= "" then TestSound(v) end end })
+    Button("Remove selected", 130, function()
+        local v = selected or CustomList()[1].value
+        for i, c in ipairs(ns.db.customSounds) do
+            if c.path == v then table.remove(ns.db.customSounds, i); break end
+        end
+        selected = nil
+        Changed()
+    end, RIGHT)
+    y = y - 30
+
     -- 1. Demon Armor
-    IconSection("Demon Armor / Demon Skin", "armor")
+    if ns.modules.armor then
+        IconSection("Demon Armor / Demon Skin", "armor")
+    end
 
     -- 2. Soul Shards
     if ns.modules.shards then
@@ -310,6 +375,11 @@ local function Build()
 
     -- 4. Soulstone
     IconSection("Soulstone", "soulstone", function(get)
+        if not ns.SHARD_ITEMS then
+            -- Cast directly on the target: there's only the "not applied" state.
+            GlowAndSound(function() return get().states.use end)
+            return
+        end
         Check("Remind to create a new Soulstone while one is applied", function() return get().createWhileApplied end, function(v) get().createWhileApplied = v end)
         SubHeader("State: Soulstone in bags but not applied")
         GlowAndSound(function() return get().states.use end)
@@ -324,6 +394,20 @@ local function Build()
     Check("Show Soulstone icon left of the timer", function() return lb().showIcon end, function(v) lb().showIcon = v end)
     Slider("Background opacity, %", 0, 100, 5, function() return math.floor(lb().bgAlpha * 100 + 0.5) end, function(v) lb().bgAlpha = v / 100 end)
     FontRows(lb, { { "Name size", "nameSize" }, { "Timer size", "timerSize" } })
+    Color("Timer color", function() return lb().timerColor end, function(v) lb().timerColor = v end)
+    for _, z in ipairs({ { "warn", "Timer: warning zone" }, { "crit", "Timer: critical zone" } }) do
+        local get = function() return lb().zones[z[1]] end
+        SubHeader(z[2])
+        Check("Enable", function() return get().enabled end, function(v) get().enabled = v end)
+        Slider("Starts at, seconds left", 5, 1800, 5, function() return get().seconds end, function(v) get().seconds = v end)
+        Color("Timer color in this zone", function() return get().color end, function(v) get().color = v end)
+        SoundRows(get, "Play sound when the zone starts")
+    end
+    SubHeader("Timer: Soulstone ran out")
+    SoundRows(function() return lb().expired end, "Play sound when the timer runs out")
+    Slider("Preview timer speed, x", 1, 600, 1, function() return lb().previewSpeed end, function(v) lb().previewSpeed = v end)
+    Note("The critical zone wins where the zones overlap. In preview mode the timer runs faster by the speed above " ..
+        "(300x: a second per 5 minutes) and the sounds play on every cycle.")
 
     -- 5. Demon
     IconSection("Demon (pet)", "pet", function(get)

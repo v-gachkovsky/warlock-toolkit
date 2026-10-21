@@ -92,7 +92,13 @@ function M:Update()
     end
 
     local count = ns.ItemCount(D.SOUL_SHARD)
-    local desired = self:Desired()
+    local desired, parts = self:Desired()
+    -- Nothing learned that spends shards yet (low level): no counter and no "low" alert.
+    if #parts == 0 and not ns.db.preview then
+        f:Hide()
+        self.low = nil
+        return
+    end
     local low = count < self:Threshold()
 
     f.text:SetText(cfg.showDesired and string.format("%d/%d", count, desired) or tostring(count))

@@ -70,6 +70,7 @@ Voidwalker, Succubus, Incubus, Felhunter or Felguard.
 - **Snapping**: drop an element next to another one and it lines up neatly, so building rows and columns is easy.
   Snap distance and spacing are adjustable.
 - **Background opacity** for the shard counter and the Soulstone label.
+- **Sounds**: 14 game sounds, LibSharedMedia sounds, or **your own .ogg / .mp3 files** for every alert.
 
 ## Built for combat
 

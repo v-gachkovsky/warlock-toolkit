@@ -34,6 +34,7 @@ ns.defaults = {
     -- Opacity of all addon frames in / out of combat; click-through in combat.
     combat = { clickThrough = false, alpha = 1, idleAlpha = 1, glow = true, hide = false },
     minimap = { hide = false, locked = false, angle = 215 },
+    customSounds = {}, -- { name = "alarm", path = "Interface\\WarlockToolkitSounds\\alarm.ogg" }
     armor = Icon(-135, 160),
     healthstone = Icon(-90, 160),
     soulstone = Icon(-45, 160, {
@@ -53,6 +54,14 @@ ns.defaults = {
         font = "Fonts\\FRIZQT__.TTF", outline = "OUTLINE",
         nameSize = 14, timerSize = 12,
         showIcon = true, bgAlpha = 0.3, showSelf = true,
+        -- Timer zones by seconds left; `crit` wins where they overlap. Sounds play when a zone starts.
+        timerColor = { 1, 1, 1, 1 },
+        zones = {
+            warn = { enabled = true, seconds = 300, color = { 1, 0.82, 0, 1 }, sound = false, soundName = "RAID_WARNING" },
+            crit = { enabled = true, seconds = 60, color = { 1, 0.2, 0.2, 1 }, sound = false, soundName = "RAID_WARNING" },
+        },
+        expired = { sound = false, soundName = "RAID_WARNING" },
+        previewSpeed = 300, -- preview timer: Soulstone seconds per real second
     },
     shards = {
         enabled = true, locked = false,
@@ -149,9 +158,13 @@ function ns:SetAllLocked(locked)
     self:ApplyAll()
 end
 
--- Classic Era, Forever and TBC keep Soul Shards as bag items. From Cataclysm on
--- (Mists, Retail) they are a resource with its own game UI, so there's no shard counter.
-ns.SHARD_ITEMS = select(4, GetBuildInfo()) < 40000
+local TOC = select(4, GetBuildInfo())
+-- Classic Era, Forever and TBC keep Soul Shards and Soulstones as bag items. From Cataclysm on
+-- (Mists, Retail) shards are a resource with its own game UI, so there's no shard counter,
+-- and the Soulstone is cast directly on the target.
+ns.SHARD_ITEMS = TOC < 40000
+-- Demon Skin / Demon Armor / Fel Armor were removed in Mists.
+ns.HAS_ARMOR = TOC < 50000
 
 ------------------------------------------------------------------------
 -- Helpers: spells, items, auras, secrets

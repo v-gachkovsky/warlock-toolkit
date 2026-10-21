@@ -20,14 +20,27 @@ ns.OUTLINES = {
     { value = "THICKOUTLINE", text = "Thick outline" },
 }
 
+-- Game sounds by SOUNDKIT key; `id` is the fallback when a client lacks the key.
 ns.SOUNDS = {
-    { value = "RAID_WARNING",          text = "Raid Warning", id = 8959 },
-    { value = "READY_CHECK",           text = "Ready Check",  id = 8960 },
-    { value = "ALARM_CLOCK_WARNING_3", text = "Alarm Clock",  id = 12889 },
-    { value = "UI_BNET_TOAST",         text = "Toast",        id = 18019 },
-    { value = "TELL_MESSAGE",          text = "Whisper",      id = 3081 },
-    { value = "MAP_PING",              text = "Map Ping",     id = 3175 },
+    { value = "RAID_WARNING",                 text = "Raid Warning",        id = 8959 },
+    { value = "READY_CHECK",                  text = "Ready Check",         id = 8960 },
+    { value = "ALARM_CLOCK_WARNING_1",        text = "Alarm Clock 1",       id = 12867 },
+    { value = "ALARM_CLOCK_WARNING_2",        text = "Alarm Clock 2",       id = 12868 },
+    { value = "ALARM_CLOCK_WARNING_3",        text = "Alarm Clock 3",       id = 12889 },
+    { value = "RAID_BOSS_EMOTE_WARNING",      text = "Boss Emote",          id = 12197 },
+    { value = "UI_RAID_BOSS_WHISPER_WARNING", text = "Boss Whisper",        id = 37666 },
+    { value = "PVP_THROUGH_QUEUE",            text = "Queue Ready",         id = 8459 },
+    { value = "LEVEL_UP",                     text = "Level Up",            id = 888 },
+    { value = "IG_PLAYER_INVITE",             text = "Group Invite",        id = 880 },
+    { value = "AUCTION_WINDOW_OPEN",          text = "Auction House",       id = 5274 },
+    { value = "UI_BNET_TOAST",                text = "Toast",               id = 18019 },
+    { value = "TELL_MESSAGE",                 text = "Whisper",             id = 3081 },
+    { value = "MAP_PING",                     text = "Map Ping",            id = 3175 },
 }
+
+-- Folder for the player's own sound files; a bare file name in "Custom sounds" points here.
+-- It lies outside the addon folder so addon updates don't delete the files.
+ns.CUSTOM_SOUND_DIR = "Interface\\WarlockToolkitSounds\\"
 
 function ns.GetFontList()
     local list, seen = {}, {}
@@ -52,14 +65,86 @@ function ns.ApplyFont(fs, path, size, outline)
     end
 end
 
+-- Player names can come from other regions. The chosen font usually covers Latin only,
+-- so names use a font family that takes Cyrillic and CJK glyphs from the game's own
+-- fonts (the same files the default UI uses for them).
+local NAME_ALPHABETS = {
+    { alphabet = "russian",            file = "Fonts\\FRIZQT___CYR.TTF" },
+    { alphabet = "korean",             file = "Fonts\\2002.TTF" },
+    { alphabet = "simplifiedchinese",  file = "Fonts\\ARKai_T.ttf" },
+    { alphabet = "traditionalchinese", file = "Fonts\\blei00d.TTF" },
+}
+local nameFamilies, nameFamilyCount = {}, 0
+local fontProbe
+
+-- A font set with SetFont stays on the FontString and overrides any font object,
+-- so the chosen font is checked on a hidden probe and `fs` only gets the family.
+function ns.ApplyNameFont(fs, path, size, outline)
+    if not CreateFontFamily then return ns.ApplyFont(fs, path, size, outline) end
+    if not fontProbe then fontProbe = UIParent:CreateFontString(nil, "BACKGROUND") end
+    ns.ApplyFont(fontProbe, path, size, outline)
+    local file = fontProbe:GetFont()
+    if not file then return ns.ApplyFont(fs, path, size, outline) end
+    outline = outline or ""
+    local key = file .. "|" .. size .. "|" .. outline
+    local family = nameFamilies[key]
+    if family == nil then
+        local members = { { alphabet = "roman", file = file, height = size, flags = outline } }
+        for _, a in ipairs(NAME_ALPHABETS) do
+            members[#members + 1] = { alphabet = a.alphabet, file = a.file, height = size, flags = outline }
+        end
+        nameFamilyCount = nameFamilyCount + 1
+        local ok, f = pcall(CreateFontFamily, "WarlockToolkitNameFont" .. nameFamilyCount, members)
+        if not ok then ns.Print("can't create the name font: %s", tostring(f)) end
+        family = ok and f or false
+        nameFamilies[key] = family
+    end
+    if family then fs:SetFontObject(family) else ns.ApplyFont(fs, path, size, outline) end
+end
+
+-- Game sounds, then the player's files, then sounds from LibSharedMedia (value = file path).
+function ns.GetSoundList()
+    local list, seen = {}, {}
+    for _, s in ipairs(ns.SOUNDS) do list[#list + 1] = s; seen[s.value] = true end
+    for _, c in ipairs(ns.db and ns.db.customSounds or {}) do
+        if not seen[c.path] then
+            list[#list + 1] = { value = c.path, text = c.name .. " (custom)" }
+            seen[c.path] = true
+        end
+    end
+    local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+    if LSM then
+        for _, name in ipairs(LSM:List("sound")) do
+            local path = LSM:Fetch("sound", name)
+            if path and path ~= "" and not seen[path] then
+                list[#list + 1] = { value = path, text = name }
+                seen[path] = true
+            end
+        end
+    end
+    return list
+end
+
+-- "alarm.ogg" -> Interface\WarlockToolkitSounds\alarm.ogg; full paths are kept.
+function ns.NormalizeSoundPath(path)
+    path = (path or ""):gsub("^%s+", ""):gsub("%s+$", ""):gsub("/", "\\")
+    if path == "" then return nil end
+    if not path:lower():find("^interface\\") then path = ns.CUSTOM_SOUND_DIR .. path end
+    return path
+end
+
+-- Returns whether the sound will play (false for a missing or unreadable file).
 function ns.PlaySound(name)
+    if not name then return false end
     for _, s in ipairs(ns.SOUNDS) do
         if s.value == name then
             local id = (SOUNDKIT and SOUNDKIT[s.value]) or s.id
-            pcall(PlaySound, id, "Master")
-            return
+            local ok, willPlay = pcall(PlaySound, id, "Master")
+            return ok and willPlay ~= false
         end
     end
+    local ok, willPlay = pcall(PlaySoundFile, name, "Master")
+    return ok and willPlay and true or false
 end
 
 ------------------------------------------------------------------------

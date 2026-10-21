@@ -1,4 +1,6 @@
 local _, ns = ...
+-- Only clients that still have the armor spells get the icon (see ns.HAS_ARMOR).
+if not ns.HAS_ARMOR then return end
 local D = ns.data
 local M = ns:NewModule("armor")
 
