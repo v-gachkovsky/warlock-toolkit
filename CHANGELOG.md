@@ -4,7 +4,23 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/).
 
-## [1.0.2] - Unreleased
+## [1.1.0] - 2026-10-22
+
+### Changed
+- **Renamed to WarlockUpkeep!** (was Warlock Toolkit): the addon folder is now `WarlockUpkeep`, slash
+  commands are `/wu` and `/warlockupkeep`, and custom sounds go into `Interface/WarlockUpkeepSounds/`.
+  Settings saved under the old name aren't carried over.
+- The armor options (on WoW Forever), README and CurseForge page now say to add Demon Skin and Demon Armor
+  to the Cooldown Manager's Tracked Buffs, which in-combat armor tracking relies on.
+
+### Fixed
+- Classic Era / TBC / Mists: removing a buff in combat didn't bring its icon back until the fight ended,
+  as if auras were hidden in combat there too. They're read as usual now; only Forever and Retail hide them.
+- Soulstone: a stone removed or used during a fight (WoW Forever, Retail) is picked up right after combat.
+- Classic clients without the newer aura API fall back to the plain buff list for the armor, Grimoire of
+  Sacrifice and Soulstone tracking.
+
+## [1.0.2] - 2026-10-22
 
 ### Added
 - **Preview shows every icon, learned or not** (also with simulated combat), so a low-level character can

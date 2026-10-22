@@ -1,6 +1,6 @@
-<p align="center"><img src="docs/logo-curseforge.png" width="128" alt="Warlock Toolkit"></p>
+<p align="center"><img src="docs/logo-curseforge.png" width="128" alt="WarlockUpkeep!"></p>
 
-<h1 align="center">Warlock Toolkit</h1>
+<h1 align="center">WarlockUpkeep!</h1>
 
 <p align="center">
   Reminders and one-click buttons for Warlocks in <b>World of Warcraft: Forever</b><br>
@@ -72,7 +72,7 @@ One addon folder works on every client: the TOC lists all interface versions
 
 ## Installation
 
-Copy or symlink the `WarlockToolkit` folder into `Interface/AddOns/` of the client you play:
+Copy or symlink the `WarlockUpkeep` folder into `Interface/AddOns/` of the client you play:
 
 | Client | Folder |
 |--------|--------|
@@ -87,10 +87,10 @@ For development, a symlink from the repository root is handy:
 
 ```sh
 # beta
-ln -s "$PWD/WarlockToolkit" "/Applications/World of Warcraft/_classic_beta_/Interface/AddOns/WarlockToolkit"
+ln -s "$PWD/WarlockUpkeep" "/Applications/World of Warcraft/_classic_beta_/Interface/AddOns/WarlockUpkeep"
 
 # release
-ln -s "$PWD/WarlockToolkit" "/Applications/World of Warcraft/_forever_/Interface/AddOns/WarlockToolkit"
+ln -s "$PWD/WarlockUpkeep" "/Applications/World of Warcraft/_forever_/Interface/AddOns/WarlockUpkeep"
 ```
 
 ## Features
@@ -109,6 +109,10 @@ The icon appears when you have neither Demon Skin, Demon Armor nor Fel Armor. Cl
 strongest armor: Fel Armor once learned (TBC), otherwise Demon Armor, or Demon Skin before that.
 It works the same in combat: the icon shows up as soon as the buff is removed, dispelled or expires,
 and disappears when you recast it (see [Client limitations](#client-limitations)).
+
+> **WoW Forever: add Demon Skin and Demon Armor to the Cooldown Manager's Tracked Buffs.** The game hides
+> your buffs from addons in combat, and without the Cooldown Manager the addon can't always tell that the
+> armor was removed during a fight. Classic Era and TBC don't need this.
 
 ### 2. Soul Shards
 
@@ -238,7 +242,7 @@ Every alert can play a sound. The list has 14 game sounds, sounds from
 [LibSharedMedia](https://www.curseforge.com/wow/addons/libsharedmedia-3-0) if another addon provides it,
 and your own files:
 
-1. Put `.ogg` or `.mp3` files into `World of Warcraft/<client>/Interface/WarlockToolkitSounds/`.
+1. Put `.ogg` or `.mp3` files into `World of Warcraft/<client>/Interface/WarlockUpkeepSounds/`.
    The folder is outside the addon, so updates don't delete your files.
 2. Fully restart the game: `/reload` doesn't see new files.
 3. In **Custom sounds**, enter the file name (`alarm.ogg`) or a full path starting with `Interface\`
@@ -256,13 +260,13 @@ The shard counter and the Soulstone label have a background opacity setting from
 
 | Command | Action |
 |---------|--------|
-| `/wlt` | Opens the settings (also available under *Options → AddOns*) |
-| `/wlt lock` | Locks all elements |
-| `/wlt unlock` | Unlocks all elements |
-| `/wlt preview` | Shows all icons so you can position them, including spells not learned yet |
-| `/wlt combat` | Toggles combat simulation |
-| `/wlt reset` | Resets the settings |
-| `/wlt auras` | Prints diagnostics of your buffs and recent aura events (useful for bug reports) |
+| `/wu` | Opens the settings (also available under *Options → AddOns*) |
+| `/wu lock` | Locks all elements |
+| `/wu unlock` | Unlocks all elements |
+| `/wu preview` | Shows all icons so you can position them, including spells not learned yet |
+| `/wu combat` | Toggles combat simulation |
+| `/wu reset` | Resets the settings |
+| `/wu auras` | Prints diagnostics of your buffs and recent aura events (useful for bug reports) |
 
 **Combat simulation** lets you see out of combat exactly how everything behaves in a fight: opacity,
 highlight, hidden icons and click-through. Icons that aren't needed stay in place invisible, as in combat.
@@ -313,9 +317,12 @@ your buffs from the game's own frames, which keep working:
   It never shows the icon while the buff is on: food buffs and buffs from other players are never taken
   for yours.
 
-This covers armor, Grimoire of Sacrifice and a Soulstone on yourself. A Soulstone on another player comes
-from your cast and timer; a used or removed one is noticed when they're visible. Bag items (Healthstone,
-Soulstone, Soul Shards) and the demon are always readable.
+This covers armor and Grimoire of Sacrifice. Bag items (Healthstone, Soulstone, Soul Shards) and the demon
+are always readable.
+
+**Soulstone in combat.** On WoW Forever and Retail a Soulstone removed in combat (from yourself or another
+player) is noticed only after the fight; the label and icon update then. A Soulstone can't be dispelled,
+so this matters little: check it before the pull. Out of combat a used or removed Soulstone is noticed when the player is visible.
 
 **Spell and item IDs** come from Classic Era and later clients (`Data.lua`). If they differ in Forever, the addon tries to find
 the spell by name. New stones or ranks can be added to `Data.lua`.
@@ -323,8 +330,8 @@ the spell by name. New stones or ranks can be added to `Data.lua`.
 ## Project structure
 
 ```
-WarlockToolkit/
-├── WarlockToolkit.toc   # addon manifest
+WarlockUpkeep/
+├── WarlockUpkeep.toc   # addon manifest
 ├── Data.lua             # spell and item IDs
 ├── Core.lua             # core: modules, settings, events
 ├── Widgets.lua          # secure icons, highlight, moving, snapping

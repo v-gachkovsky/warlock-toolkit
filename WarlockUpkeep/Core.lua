@@ -1,12 +1,12 @@
 local ADDON, ns = ...
-_G.WarlockToolkit = ns
+_G.WarlockUpkeep = ns
 
 ns.moduleList = {}
 ns.modules = {}
 ns.icons = {}
 ns.ready = false
 
-local L_PREFIX = "|cff9482c9Warlock Toolkit|r: "
+local L_PREFIX = "|cff9482c9WarlockUpkeep!|r: "
 function ns.Print(...) print(L_PREFIX .. string.format(...)) end
 
 ------------------------------------------------------------------------
@@ -34,7 +34,7 @@ ns.defaults = {
     -- Opacity of all addon frames in / out of combat; click-through in combat.
     combat = { clickThrough = false, alpha = 1, idleAlpha = 1, glow = true, hide = false },
     minimap = { hide = false, locked = false, angle = 215 },
-    customSounds = {}, -- { name = "alarm", path = "Interface\\WarlockToolkitSounds\\alarm.ogg" }
+    customSounds = {}, -- { name = "alarm", path = "Interface\\WarlockUpkeepSounds\\alarm.ogg" }
     armor = Icon(-135, 160),
     healthstone = Icon(-90, 160),
     soulstone = Icon(-45, 160, {
@@ -90,8 +90,8 @@ local function CopyDefaults(src, dst)
 end
 
 function ns:ResetDB()
-    wipe(WarlockToolkitDB)
-    CopyDefaults(self.defaults, WarlockToolkitDB)
+    wipe(WarlockUpkeepDB)
+    CopyDefaults(self.defaults, WarlockUpkeepDB)
     self:ApplyAll()
 end
 
@@ -101,7 +101,7 @@ end
 local eventFrame = CreateFrame("Frame")
 local unitEventFrame = CreateFrame("Frame")
 local handlers = {}
-ns.eventStatus = {} -- event -> how it got registered, or why it failed (shown by /wlt auras)
+ns.eventStatus = {} -- event -> how it got registered, or why it failed (shown by /wu auras)
 
 local function OnEvent(_, event, ...)
     local list = handlers[event]
@@ -169,7 +169,7 @@ function ns:NewModule(name)
     return m
 end
 
--- Timeline for /wlt auras: what happened when (ms precision), to find where reactions lag.
+-- Timeline for /wu auras: what happened when (ms precision), to find where reactions lag.
 ns.trace = {}
 function ns.Trace(fmt, ...)
     local ok, msg = pcall(string.format, fmt, ...)
@@ -317,7 +317,18 @@ end
 -- The player's aura from `ids` (AuraData), false if there is none, or nil when auras are
 -- unreadable: secret auras read as "not found" instead of failing, so in combat that's unknown.
 function ns.PlayerAura(ids)
-    if not C_UnitAuras then return nil end
+    if not (C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID) then
+        -- Older Classic clients: the plain buff list.
+        if not UnitBuff then return nil end
+        local want = {}
+        for _, id in ipairs(ids) do want[id] = true end
+        for i = 1, 40 do
+            local name, icon, _, _, _, expirationTime, _, _, _, spellId = UnitBuff("player", i)
+            if not name then break end
+            if want[spellId] then return { expirationTime = expirationTime, icon = icon } end
+        end
+        return false
+    end
     local unknown = false
     for _, id in ipairs(ids) do
         local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, id)
@@ -393,7 +404,7 @@ end
 
 -- UNIT_AURA update info for the player: catches the buff's removal and, in combat, its new instance.
 function BuffTracker:OnAuraUpdate(info)
-    self.lastInfo = { at = GetTime(), info = info } -- for /wlt auras
+    self.lastInfo = { at = GetTime(), info = info } -- for /wu auras
     if type(info) ~= "table" or ns.IsSecret(info) then return end
     local now = GetTime()
     local justCast = self.castAt and now - self.castAt <= CAST_WINDOW
@@ -574,13 +585,13 @@ function ns.NewBuffTracker(ids, duration, name)
     return Mixin({ ids = ids, isID = isID, duration = duration, icons = {}, name = name }, BuffTracker)
 end
 
+-- Only clients with secret values (Forever, Retail) hide auras in combat; Classic clients read
+-- them in combat as usual, so a missing buff there is really missing.
 function ns.AurasSecret()
-    if InCombatLockdown() then return true end
-    if C_Secrets and C_Secrets.ShouldAurasBeSecret then
-        local ok, s = pcall(C_Secrets.ShouldAurasBeSecret)
-        if ok and s then return true end
-    end
-    return false
+    if not (C_Secrets and C_Secrets.ShouldAurasBeSecret) then return false end
+    local ok, s = pcall(C_Secrets.ShouldAurasBeSecret)
+    if not ok then return InCombatLockdown() end
+    return s and true or false
 end
 
 ------------------------------------------------------------------------
@@ -588,11 +599,11 @@ end
 ------------------------------------------------------------------------
 ns:RegisterEvent("ADDON_LOADED", function(_, name)
     if name ~= ADDON then return end
-    WarlockToolkitDB = WarlockToolkitDB or {}
-    WarlockToolkitCharDB = WarlockToolkitCharDB or {}
-    CopyDefaults(ns.defaults, WarlockToolkitDB)
-    ns.db = WarlockToolkitDB
-    ns.cdb = WarlockToolkitCharDB
+    WarlockUpkeepDB = WarlockUpkeepDB or {}
+    WarlockUpkeepCharDB = WarlockUpkeepCharDB or {}
+    CopyDefaults(ns.defaults, WarlockUpkeepDB)
+    ns.db = WarlockUpkeepDB
+    ns.cdb = WarlockUpkeepCharDB
 end)
 
 ns:RegisterEvent("PLAYER_LOGIN", function()
@@ -673,9 +684,9 @@ end
 ------------------------------------------------------------------------
 -- Slash commands
 ------------------------------------------------------------------------
-SLASH_WARLOCKTOOLKIT1 = "/wlt"
-SLASH_WARLOCKTOOLKIT2 = "/warlocktoolkit"
-SlashCmdList.WARLOCKTOOLKIT = function(msg)
+SLASH_WARLOCKUPKEEP1 = "/wu"
+SLASH_WARLOCKUPKEEP2 = "/warlockupkeep"
+SlashCmdList.WARLOCKUPKEEP = function(msg)
     if not ns.active then
         ns.Print("disabled: this character is not a Warlock.")
         return

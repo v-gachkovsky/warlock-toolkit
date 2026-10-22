@@ -32,7 +32,7 @@ end
 
 function M:ApplySettings() end
 
--- /wlt auras: what the client returns for the armor buff right now (to diagnose combat secrecy).
+-- /wu auras: what the client returns for the armor buff right now (to diagnose combat secrecy).
 local function Describe(v)
     if ns.IsSecret(v) then
         local ok, t = pcall(type, v)
@@ -107,6 +107,47 @@ function ns.DebugAuras()
     P("tracker icons: %s; SpellTexture(687): %s; FindInBuffFrame: %s; FindInCooldownViewer: %s", table.concat(icons, ", "),
         Try(ns.SpellTexture, 687), Try(function() return buff:FindInBuffFrame() end),
         Try(function() return buff:FindInCooldownViewer() end))
+    -- What FindInBuffFrame works from: the buff frame's aura list.
+    local info = BuffFrame and BuffFrame.auraInfo
+    if type(info) == "table" and not ns.IsSecret(info) then
+        local secret, buffs, out = 0, 0, {}
+        for _, a in ipairs(info) do
+            if type(a) ~= "table" or ns.IsSecret(a) then
+                secret = secret + 1
+            elseif a.auraType == "Buff" then
+                buffs = buffs + 1
+                if #out < 4 then
+                    out[#out + 1] = string.format("{id %s, tex %s}", Describe(a.auraInstanceID), Describe(a.texture))
+                end
+            end
+        end
+        P("BuffFrame.auraInfo: %d entries, %d secret, %d buffs, max %s: %s", #info, secret, buffs,
+            Describe(BuffFrame.maxAuras), table.concat(out, "; "))
+    else
+        P("BuffFrame.auraInfo: %s", Describe(info))
+    end
+    -- What FindInCooldownViewer works from: the Cooldown Manager's tracked-buff items.
+    for _, name in ipairs({ "BuffIconCooldownViewer", "BuffBarCooldownViewer" }) do
+        local pool = type(_G[name]) == "table" and _G[name].itemFramePool
+        if type(pool) == "table" and type(pool.EnumerateActive) == "function" then
+            local n = 0
+            for item in pool:EnumerateActive() do
+                n = n + 1
+                local ci = item.cooldownInfo
+                local readable = type(ci) == "table" and not ns.IsSecret(ci)
+                local matches = buff:ViewerItemMatches(ci)
+                -- Only the armor's item, and items whose spell can't be read (may be the armor).
+                if matches or not readable or ns.IsSecret(ci.spellID) then
+                    P("  %s item: cooldownID %s, spellID %s, overrideSpellID %s, isActive %s, matches %s", name,
+                        Describe(item.cooldownID), Describe(readable and ci.spellID),
+                        Describe(readable and ci.overrideSpellID), Describe(item.isActive), Describe(matches))
+                end
+            end
+            P("%s: %d items", name, n)
+        else
+            P("%s: %s", name, _G[name] and "no item pool" or "not loaded")
+        end
+    end
     if buff.instance then
         local d, aura = Try(C_UnitAuras.GetAuraDataByAuraInstanceID, "player", buff.instance)
         P("GetAuraDataByAuraInstanceID(player, %s): %s", Describe(buff.instance), d)

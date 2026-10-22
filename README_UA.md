@@ -1,6 +1,6 @@
-<p align="center"><img src="docs/logo-curseforge.png" width="128" alt="Warlock Toolkit"></p>
+<p align="center"><img src="docs/logo-curseforge.png" width="128" alt="WarlockUpkeep!"></p>
 
-<h1 align="center">Warlock Toolkit</h1>
+<h1 align="center">WarlockUpkeep!</h1>
 
 <p align="center">
   Нагадування й кнопки в один клік для Warlock у <b>World of Warcraft: Forever</b><br>
@@ -72,7 +72,7 @@
 
 ## Встановлення
 
-Скопіюй або залінкуй папку `WarlockToolkit` в `Interface/AddOns/` потрібного клієнта:
+Скопіюй або залінкуй папку `WarlockUpkeep` в `Interface/AddOns/` потрібного клієнта:
 
 | Клієнт | Папка |
 |--------|-------|
@@ -87,10 +87,10 @@
 
 ```sh
 # бета
-ln -s "$PWD/WarlockToolkit" "/Applications/World of Warcraft/_classic_beta_/Interface/AddOns/WarlockToolkit"
+ln -s "$PWD/WarlockUpkeep" "/Applications/World of Warcraft/_classic_beta_/Interface/AddOns/WarlockUpkeep"
 
 # реліз
-ln -s "$PWD/WarlockToolkit" "/Applications/World of Warcraft/_forever_/Interface/AddOns/WarlockToolkit"
+ln -s "$PWD/WarlockUpkeep" "/Applications/World of Warcraft/_forever_/Interface/AddOns/WarlockUpkeep"
 ```
 
 ## Функції
@@ -109,6 +109,10 @@ ln -s "$PWD/WarlockToolkit" "/Applications/World of Warcraft/_forever_/Interface
 броню: Fel Armor, якщо вивчено (TBC), інакше Demon Armor, а до неї Demon Skin.
 У бою все так само: іконка з'являється, щойно баф зняли, розвіяли чи він закінчився, і зникає, коли
 накладаєш його знову (див. [Обмеження клієнта](#обмеження-клієнта)).
+
+> **WoW Forever: додай Demon Skin і Demon Armor у Tracked Buffs у Cooldown Manager.** У бою гра ховає твої
+> бафи від аддонів, і без Cooldown Manager аддон не завжди може помітити, що броню зняли посеред бою.
+> На Classic Era і TBC це не потрібно.
 
 ### 2. Soul Shards
 
@@ -237,7 +241,7 @@ ln -s "$PWD/WarlockToolkit" "/Applications/World of Warcraft/_forever_/Interface
 [LibSharedMedia](https://www.curseforge.com/wow/addons/libsharedmedia-3-0), якщо її надає інший аддон,
 і твої власні файли:
 
-1. Поклади файли `.ogg` або `.mp3` у `World of Warcraft/<клієнт>/Interface/WarlockToolkitSounds/`.
+1. Поклади файли `.ogg` або `.mp3` у `World of Warcraft/<клієнт>/Interface/WarlockUpkeepSounds/`.
    Тека лежить поза аддоном, тож оновлення не видалять твої файли.
 2. Повністю перезапусти гру: `/reload` нових файлів не бачить.
 3. У розділі **Custom sounds** введи назву файлу (`alarm.ogg`) або повний шлях, що починається з `Interface\`,
@@ -255,13 +259,13 @@ ln -s "$PWD/WarlockToolkit" "/Applications/World of Warcraft/_forever_/Interface
 
 | Команда | Дія |
 |---------|-----|
-| `/wlt` | Відкриває налаштування (є також кнопка в *Options → AddOns*) |
-| `/wlt lock` | Блокує всі елементи |
-| `/wlt unlock` | Розблоковує всі елементи |
-| `/wlt preview` | Показує всі іконки, щоб їх розставити, навіть для ще не вивчених заклинань |
-| `/wlt combat` | Вмикає або вимикає імітацію бою |
-| `/wlt reset` | Скидає налаштування |
-| `/wlt auras` | Друкує діагностику бафів і останніх подій аур (знадобиться для звітів про баги) |
+| `/wu` | Відкриває налаштування (є також кнопка в *Options → AddOns*) |
+| `/wu lock` | Блокує всі елементи |
+| `/wu unlock` | Розблоковує всі елементи |
+| `/wu preview` | Показує всі іконки, щоб їх розставити, навіть для ще не вивчених заклинань |
+| `/wu combat` | Вмикає або вимикає імітацію бою |
+| `/wu reset` | Скидає налаштування |
+| `/wu auras` | Друкує діагностику бафів і останніх подій аур (знадобиться для звітів про баги) |
 
 **Імітація бою** дозволяє поза боєм побачити, як саме все поводиться в бою: прозорість, підсвітку,
 приховування іконок і наскрізні кліки. Непотрібні іконки лишаються на місці невидимими, як у бою.
@@ -311,9 +315,13 @@ ln -s "$PWD/WarlockToolkit" "/Applications/World of Warcraft/_forever_/Interface
   після бою або коли закінчиться час бафу. Іконку при бафі на собі панель не покаже ніколи: бафи від їжі й
   від інших гравців не плутаються з твоїми.
 
-Так працюють броня, Grimoire of Sacrifice і Soulstone на собі. Soulstone на іншому гравці береться з твого
-касту й таймера; використаний чи знятий камінь помічається, коли гравця видно. Предмети в сумках
-(Healthstone, Soulstone, Soul Shards) і демон читаються завжди.
+Так працюють броня і Grimoire of Sacrifice. Предмети в сумках (Healthstone, Soulstone, Soul Shards) і демон
+читаються завжди.
+
+**Soulstone у бою.** На WoW Forever і Retail камінь, знятий у бою (з тебе чи з іншого гравця), аддон
+помітить лише після бою: тоді оновляться лейбл та іконка. Soulstone не розвіюється, тож це не критично:
+перевір його перед пулом. Поза боєм використаний чи знятий камінь помічається, коли
+гравця видно.
 
 **ID заклинань і предметів** узяті з Classic Era і новіших клієнтів (`Data.lua`). Якщо у Forever вони інші, аддон пробує знайти
 заклинання за назвою. Нові камені чи ранги можна дописати в `Data.lua`.
@@ -321,8 +329,8 @@ ln -s "$PWD/WarlockToolkit" "/Applications/World of Warcraft/_forever_/Interface
 ## Структура проєкту
 
 ```
-WarlockToolkit/
-├── WarlockToolkit.toc   # маніфест аддона
+WarlockUpkeep/
+├── WarlockUpkeep.toc   # маніфест аддона
 ├── Data.lua             # ID заклинань і предметів
 ├── Core.lua             # ядро: модулі, налаштування, події
 ├── Widgets.lua          # secure-іконки, підсвітка, переміщення, snap

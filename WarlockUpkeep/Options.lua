@@ -227,9 +227,9 @@ end
 -- Build
 ------------------------------------------------------------------------
 local function Build()
-    local ok, f = pcall(CreateFrame, "Frame", "WarlockToolkitOptions", UIParent, "BasicFrameTemplateWithInset")
+    local ok, f = pcall(CreateFrame, "Frame", "WarlockUpkeepOptions", UIParent, "BasicFrameTemplateWithInset")
     if not ok then
-        f = CreateFrame("Frame", "WarlockToolkitOptions", UIParent, "BackdropTemplate")
+        f = CreateFrame("Frame", "WarlockUpkeepOptions", UIParent, "BackdropTemplate")
         f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", edgeSize = 24, insets = { left = 6, right = 6, top = 6, bottom = 6 } })
         local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
         close:SetPoint("TOPRIGHT")
@@ -245,11 +245,11 @@ local function Build()
     f:SetScript("OnDragStop", f.StopMovingOrSizing)
     f:SetClampedToScreen(true)
     f:Hide()
-    tinsert(UISpecialFrames, "WarlockToolkitOptions")
+    tinsert(UISpecialFrames, "WarlockUpkeepOptions")
 
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     title:SetPoint("TOP", 8, -6)
-    title:SetText("|cff9482c9Warlock Toolkit|r")
+    title:SetText("|cff9482c9WarlockUpkeep!|r")
     local logo = f:CreateTexture(nil, "OVERLAY")
     logo:SetSize(16, 16)
     logo:SetPoint("RIGHT", title, "LEFT", -4, 0)
@@ -298,7 +298,7 @@ local function Build()
 
     -- Custom sounds: the player's own files, offered in every sound list.
     Header("Custom sounds")
-    Note("Put .ogg or .mp3 files into World of Warcraft/<client>/Interface/WarlockToolkitSounds/ and fully restart " ..
+    Note("Put .ogg or .mp3 files into World of Warcraft/<client>/Interface/WarlockUpkeepSounds/ and fully restart " ..
         "the game (a /reload doesn't find new files). Then add each file here by its name, e.g. alarm.ogg, " ..
         "or by a full path starting with Interface\\. Added files appear in every Sound list.")
     local function AddSound(text)
@@ -339,7 +339,15 @@ local function Build()
 
     -- 1. Demon Armor
     if ns.modules.armor then
-        IconSection("Demon Armor / Demon Skin", "armor")
+        IconSection("Demon Armor / Demon Skin", "armor", function(get)
+            -- Clients that hide auras from addons in combat (Forever).
+            if C_Secrets then
+                Note("Important: add Demon Skin and Demon Armor to the Cooldown Manager's Tracked Buffs. " ..
+                    "In combat the game hides your buffs from addons, and the Cooldown Manager is what lets " ..
+                    "this icon notice the armor being removed or recast during a fight.")
+            end
+            GlowAndSound(get)
+        end)
     end
 
     -- 2. Soul Shards
@@ -449,15 +457,15 @@ function ns.InitOptions()
     logo:SetPoint("TOPLEFT", 16, -12)
     logo:SetTexture(ns.LOGO)
     t:SetPoint("LEFT", logo, "RIGHT", 8, 0)
-    t:SetText("Warlock Toolkit")
+    t:SetText("WarlockUpkeep!")
     local b = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
     b:SetSize(200, 26)
     b:SetPoint("TOPLEFT", 16, -50)
-    b:SetText("Open settings (/wlt)")
+    b:SetText("Open settings (/wu)")
     b:SetScript("OnClick", function()
         if SettingsPanel then HideUIPanel(SettingsPanel) end
         if not panel or not panel:IsShown() then ns.ToggleOptions() end
     end)
-    local ok, category = pcall(Settings.RegisterCanvasLayoutCategory, p, "Warlock Toolkit")
+    local ok, category = pcall(Settings.RegisterCanvasLayoutCategory, p, "WarlockUpkeep!")
     if ok and category then pcall(Settings.RegisterAddOnCategory, category) end
 end

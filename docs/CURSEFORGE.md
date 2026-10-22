@@ -1,8 +1,8 @@
-# Warlock Toolkit
+# WarlockUpkeep!
 
 **Never forget your armor, stones, shards or demon again.**
 
-Warlock Toolkit is a lightweight helper for Warlocks in **World of Warcraft: Forever**. It shows an icon only when
+WarlockUpkeep! is a lightweight helper for Warlocks in **World of Warcraft: Forever**. It shows an icon only when
 something is missing, and a single click fixes it: cast your armor, create a Healthstone, apply a Soulstone or
 summon your demon.
 
@@ -28,6 +28,10 @@ Soulstone in Mists and Retail, Sayaad and Grimoire of Sacrifice in Retail.
 
 Reminds you when neither Demon Skin nor Demon Armor is up. Click to cast Demon Armor, or Demon Skin if you
 haven't learned Demon Armor yet.
+
+> **WoW Forever: add Demon Skin and Demon Armor to the Cooldown Manager's Tracked Buffs.** The game hides
+> your buffs from addons in combat, and the Cooldown Manager is what lets the addon notice the armor being
+> removed or recast during a fight.
 
 ### Soul Shard counter
 
@@ -88,11 +92,11 @@ Voidwalker, Succubus, Incubus, Felhunter or Felguard.
 
 | Command | Action |
 |---------|--------|
-| `/wlt` | Open settings (also in *Options → AddOns*) |
-| `/wlt lock` / `/wlt unlock` | Lock or unlock all elements |
-| `/wlt preview` | Show all icons to position them |
-| `/wlt combat` | Toggle combat simulation |
-| `/wlt reset` | Reset settings |
+| `/wu` | Open settings (also in *Options → AddOns*) |
+| `/wu lock` / `/wu unlock` | Lock or unlock all elements |
+| `/wu preview` | Show all icons to position them |
+| `/wu combat` | Toggle combat simulation |
+| `/wu reset` | Reset settings |
 
 ## Minimap button
 
@@ -115,12 +119,15 @@ button in the settings. The shard counter and the Soulstone label are dragged wi
   a faded-out icon still takes clicks at its spot unless click-through is on. Settings changed in combat
   apply after combat.
 - WoW Forever hides auras in combat. The addon remembers your buffs before the fight and notices in combat
-  when they are removed or run out.
+  when they are removed or run out. For the armor, add Demon Skin and Demon Armor to the Cooldown Manager's
+  Tracked Buffs so changes during a fight are caught too.
+- A Soulstone removed in combat (WoW Forever, Retail) is noticed only after the fight. It can't be
+  dispelled, so check it before the pull.
 - Spell and item IDs come from Classic Era. If anything differs in Forever, the addon looks the spell up by name.
 
 ## Feedback
 
-Found a bug or have an idea? Open an issue on [GitHub](https://github.com/v-gachkovsky/warlock-toolkit/issues).
+Found a bug or have an idea? Open an issue on [GitHub](https://github.com/v-gachkovsky/warlock-upkeep/issues).
 
 ---
 

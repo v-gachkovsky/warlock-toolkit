@@ -151,15 +151,24 @@ local function IsSelf(t)
     return (t.full or t.name) == UnitName("player")
 end
 
+-- Buff `i` of `unit` cast by the player, as AuraData. Older Classic clients only have UnitBuff.
+local function PlayerBuffByIndex(unit, i)
+    if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
+        return C_UnitAuras.GetAuraDataByIndex(unit, i, "HELPFUL|PLAYER")
+    end
+    local name, _, _, _, _, expirationTime, _, _, _, spellId = UnitBuff(unit, i, "PLAYER")
+    if name then return { spellId = spellId, expirationTime = expirationTime } end
+end
+
 -- Out of combat: read real auras of the group to confirm/correct the tracked target.
 function M:Scan()
-    if ns.AurasSecret() or not C_UnitAuras or not C_UnitAuras.GetAuraDataByIndex then return end
+    if ns.AurasSecret() or not (UnitBuff or (C_UnitAuras and C_UnitAuras.GetAuraDataByIndex)) then return end
     local found
     for _, u in ipairs(ScanUnits()) do
         if UnitExists(u) then
             local ok = pcall(function()
                 for i = 1, 40 do
-                    local a = C_UnitAuras.GetAuraDataByIndex(u, i, "HELPFUL|PLAYER")
+                    local a = PlayerBuffByIndex(u, i)
                     if not a then break end
                     if isBuff[a.spellId] then found = { unit = u, aura = a }; return end
                 end
@@ -195,7 +204,7 @@ end
 -- Label (target name in class color + timer)
 ------------------------------------------------------------------------
 function M:CreateLabel()
-    local f = CreateFrame("Frame", "WarlockToolkit_SoulstoneLabel", UIParent)
+    local f = CreateFrame("Frame", "WarlockUpkeep_SoulstoneLabel", UIParent)
     f:SetFrameStrata("MEDIUM")
     f:SetSize(120, 36)
     f.name = f:CreateFontString(nil, "OVERLAY")
@@ -324,6 +333,11 @@ function M:Init()
         M:Update()
     end)
     ns:RegisterEvent("GROUP_ROSTER_UPDATE", function() M:Update() end)
+    -- What changed in combat (hidden auras) is caught by a fresh look right after the fight.
+    ns:RegisterEvent("PLAYER_REGEN_ENABLED", function()
+        M.needScan = true
+        M:Update()
+    end)
     ns:RegisterEvent("PLAYER_TARGET_CHANGED", function()
         M.needScan = true
         if ns.db.preview then M:Update() end

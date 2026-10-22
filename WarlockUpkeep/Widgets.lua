@@ -1,7 +1,7 @@
 local _, ns = ...
 
 ns.QUESTION_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
-ns.LOGO = "Interface\\AddOns\\WarlockToolkit\\Media\\logo"
+ns.LOGO = "Interface\\AddOns\\WarlockUpkeep\\Media\\logo"
 
 ------------------------------------------------------------------------
 -- Fonts & sounds
@@ -40,7 +40,7 @@ ns.SOUNDS = {
 
 -- Folder for the player's own sound files; a bare file name in "Custom sounds" points here.
 -- It lies outside the addon folder so addon updates don't delete the files.
-ns.CUSTOM_SOUND_DIR = "Interface\\WarlockToolkitSounds\\"
+ns.CUSTOM_SOUND_DIR = "Interface\\WarlockUpkeepSounds\\"
 
 function ns.GetFontList()
     local list, seen = {}, {}
@@ -94,7 +94,7 @@ function ns.ApplyNameFont(fs, path, size, outline)
             members[#members + 1] = { alphabet = a.alphabet, file = a.file, height = size, flags = outline }
         end
         nameFamilyCount = nameFamilyCount + 1
-        local ok, f = pcall(CreateFontFamily, "WarlockToolkitNameFont" .. nameFamilyCount, members)
+        local ok, f = pcall(CreateFontFamily, "WarlockUpkeepNameFont" .. nameFamilyCount, members)
         if not ok then ns.Print("can't create the name font: %s", tostring(f)) end
         family = ok and f or false
         nameFamilies[key] = family
@@ -125,7 +125,7 @@ function ns.GetSoundList()
     return list
 end
 
--- "alarm.ogg" -> Interface\WarlockToolkitSounds\alarm.ogg; full paths are kept.
+-- "alarm.ogg" -> Interface\WarlockUpkeepSounds\alarm.ogg; full paths are kept.
 function ns.NormalizeSoundPath(path)
     path = (path or ""):gsub("^%s+", ""):gsub("%s+$", ""):gsub("/", "\\")
     if path == "" then return nil end
@@ -651,7 +651,7 @@ local function Icon_OnEnter(self)
 end
 
 function ns.CreateActionIcon(key, title)
-    local b = CreateFrame("Button", "WarlockToolkit_" .. key, UIParent, "SecureActionButtonTemplate")
+    local b = CreateFrame("Button", "WarlockUpkeep_" .. key, UIParent, "SecureActionButtonTemplate")
     Mixin(b, Icon)
     b.key, b.title = key, title
     b:RegisterForClicks("AnyUp", "AnyDown")

@@ -33,7 +33,7 @@ function M:Threshold()
 end
 
 function M:Init()
-    local f = CreateFrame("Frame", "WarlockToolkit_Shards", UIParent)
+    local f = CreateFrame("Frame", "WarlockUpkeep_Shards", UIParent)
     f:SetFrameStrata("MEDIUM")
     f:EnableMouse(true)
     self.frame = f
