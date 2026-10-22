@@ -73,7 +73,13 @@ function M:Init()
             end
         end
     end
-    ns:RegisterEvent("UNIT_PET", function(_, unit) if unit == "player" then M:Update() end end)
+    ns:RegisterEvent("UNIT_PET", function(_, unit)
+        if unit ~= "player" then return end
+        -- A demon gone is checked a moment later: taking a flight path dismisses it just before
+        -- the player counts as on the taxi.
+        if ns.Bool(UnitExists, "pet") then M:Update() end
+        C_Timer.After(0.5, function() M:Update() end)
+    end)
     ns:RegisterEvent("UNIT_AURA", function(_, unit, info)
         if ns.IsSecret(unit) or unit ~= "player" then return end
         sacrifice:OnAuraUpdate(info)
@@ -86,6 +92,9 @@ function M:Init()
         end
     end)
     ns:RegisterEvent("MODIFIER_STATE_CHANGED", function() M:UpdateModifierIcon() end)
+    -- Taking off and landing on a flight path.
+    ns:RegisterEvent("PLAYER_CONTROL_LOST", function() M:Update() end)
+    ns:RegisterEvent("PLAYER_CONTROL_GAINED", function() M:Update() end)
 end
 
 function M:ApplySettings() end
@@ -120,7 +129,19 @@ function M:Update()
     else
         hasPet = exists and not dead
     end
+    if self.lastHasPet and not hasPet then self.petLostAt = GetTime() end
     self.lastHasPet = hasPet
+
+    -- A flight path dismisses the demon until landing: while flying, the demon counts as there if it
+    -- was there at takeoff (gone just now, a moment before the player counts as on the taxi).
+    if UnitOnTaxi and ns.Bool(UnitOnTaxi, "player") then
+        if self.taxiHadPet == nil then
+            self.taxiHadPet = hasPet or (self.petLostAt ~= nil and GetTime() - self.petLostAt < 2)
+        end
+        hasPet = self.taxiHadPet
+    else
+        self.taxiHadPet = nil
+    end
     if not hasPet then
         hasPet = sacrifice:Read() == true
     end
