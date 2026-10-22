@@ -73,7 +73,13 @@ function M:Init()
             end
         end
     end
-    ns:RegisterEvent("UNIT_PET", function(_, unit) if unit == "player" then M:Update() end end)
+    ns:RegisterEvent("UNIT_PET", function(_, unit)
+        if unit ~= "player" then return end
+        -- A demon gone is checked a moment later: taking a flight path dismisses it just before
+        -- the player counts as on the taxi.
+        if ns.Bool(UnitExists, "pet") then M:Update() end
+        C_Timer.After(0.5, function() M:Update() end)
+    end)
     ns:RegisterEvent("UNIT_AURA", function(_, unit, info)
         if ns.IsSecret(unit) or unit ~= "player" then return end
         sacrifice:OnAuraUpdate(info)
@@ -86,6 +92,9 @@ function M:Init()
         end
     end)
     ns:RegisterEvent("MODIFIER_STATE_CHANGED", function() M:UpdateModifierIcon() end)
+    -- A flight path dismisses the demon until landing: no reminder while flying.
+    ns:RegisterEvent("PLAYER_CONTROL_LOST", function() M:Update() end)
+    ns:RegisterEvent("PLAYER_CONTROL_GAINED", function() M:Update() end)
 end
 
 function M:ApplySettings() end
@@ -124,6 +133,7 @@ function M:Update()
     if not hasPet then
         hasPet = sacrifice:Read() == true
     end
-    b:SetState(not hasPet and "missing" or nil)
+    local onTaxi = UnitOnTaxi and ns.Bool(UnitOnTaxi, "player")
+    b:SetState(not hasPet and not onTaxi and "missing" or nil)
     self:UpdateModifierIcon()
 end

@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- The demon icon no longer shows while you're on a flight path (the game dismisses the demon until landing).
+
 ## [1.1.0] - 2026-10-22
 
 ### Changed
