@@ -92,7 +92,7 @@ function M:Init()
         end
     end)
     ns:RegisterEvent("MODIFIER_STATE_CHANGED", function() M:UpdateModifierIcon() end)
-    -- A flight path dismisses the demon until landing: no reminder while flying.
+    -- Taking off and landing on a flight path.
     ns:RegisterEvent("PLAYER_CONTROL_LOST", function() M:Update() end)
     ns:RegisterEvent("PLAYER_CONTROL_GAINED", function() M:Update() end)
 end
@@ -129,11 +129,22 @@ function M:Update()
     else
         hasPet = exists and not dead
     end
+    if self.lastHasPet and not hasPet then self.petLostAt = GetTime() end
     self.lastHasPet = hasPet
+
+    -- A flight path dismisses the demon until landing: while flying, the demon counts as there if it
+    -- was there at takeoff (gone just now, a moment before the player counts as on the taxi).
+    if UnitOnTaxi and ns.Bool(UnitOnTaxi, "player") then
+        if self.taxiHadPet == nil then
+            self.taxiHadPet = hasPet or (self.petLostAt ~= nil and GetTime() - self.petLostAt < 2)
+        end
+        hasPet = self.taxiHadPet
+    else
+        self.taxiHadPet = nil
+    end
     if not hasPet then
         hasPet = sacrifice:Read() == true
     end
-    local onTaxi = UnitOnTaxi and ns.Bool(UnitOnTaxi, "player")
-    b:SetState(not hasPet and not onTaxi and "missing" or nil)
+    b:SetState(not hasPet and "missing" or nil)
     self:UpdateModifierIcon()
 end

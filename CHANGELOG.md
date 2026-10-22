@@ -7,7 +7,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
-- The demon icon no longer shows while you're on a flight path (the game dismisses the demon until landing).
+- The demon icon no longer shows up when you take a flight path with your demon out (the game dismisses it
+  until landing). Without a demon the icon stays during the flight.
 
 ## [1.1.0] - 2026-10-22
 
