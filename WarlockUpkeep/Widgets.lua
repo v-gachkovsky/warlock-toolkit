@@ -565,6 +565,7 @@ end
 function Icon:ShouldShow()
     local cfg = self:Cfg()
     if not cfg.enabled then return false end
+    if ns.db.hideOnTaxi and ns.OnTaxi() then return false end
     -- Simulated combat with "hide icons in combat" (real combat hides them in PrepareForCombat).
     if ns.db.previewCombat and not ns.inCombat and ns.db.combat.hide then return false end
     if self.state then return true end

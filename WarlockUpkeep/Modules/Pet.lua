@@ -92,9 +92,6 @@ function M:Init()
         end
     end)
     ns:RegisterEvent("MODIFIER_STATE_CHANGED", function() M:UpdateModifierIcon() end)
-    -- Taking off and landing on a flight path.
-    ns:RegisterEvent("PLAYER_CONTROL_LOST", function() M:Update() end)
-    ns:RegisterEvent("PLAYER_CONTROL_GAINED", function() M:Update() end)
 end
 
 function M:ApplySettings() end
@@ -134,7 +131,7 @@ function M:Update()
 
     -- A flight path dismisses the demon until landing: while flying, the demon counts as there if it
     -- was there at takeoff (gone just now, a moment before the player counts as on the taxi).
-    if UnitOnTaxi and ns.Bool(UnitOnTaxi, "player") then
+    if ns.OnTaxi() then
         if self.taxiHadPet == nil then
             self.taxiHadPet = hasPet or (self.petLostAt ~= nil and GetTime() - self.petLostAt < 2)
         end
