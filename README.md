@@ -214,6 +214,7 @@ These General settings apply to the icons, the shard counter and the Soulstone l
 | Out-of-combat opacity | 100% | Fully opaque |
 | In-combat opacity | 100% | Can't go below 20%, so nearly invisible icons don't steal clicks |
 | *Hide icons in combat* | off | Hides the icons for the whole fight. Turned on mid-fight, it applies at once |
+| *Hide all icons while on a flight path* | off | Hides the icons from takeoff to landing |
 | *Click-through in combat* | off | In combat all addon elements ignore the mouse, so you can click targets and turn the camera through them. With it off, icons are clickable in combat, also those that show up mid-fight |
 
 > [!TIP]

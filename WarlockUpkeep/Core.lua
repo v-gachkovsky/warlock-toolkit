@@ -34,6 +34,7 @@ ns.defaults = {
     -- Opacity of all addon frames in / out of combat; click-through in combat.
     combat = { clickThrough = false, alpha = 1, idleAlpha = 1, glow = true, hide = false },
     minimap = { hide = false, locked = false, angle = 215 },
+    hideOnTaxi = false, -- hide all icons during a flight path
     customSounds = {}, -- { name = "alarm", path = "Interface\\WarlockUpkeepSounds\\alarm.ogg" }
     armor = Icon(-135, 160),
     healthstone = Icon(-90, 160),
@@ -660,6 +661,14 @@ ns:RegisterEvent("PLAYER_REGEN_ENABLED", function()
     ns.inCombat = false
     ns:ApplyAll()
 end)
+
+-- Taking off and landing on a flight path.
+ns:RegisterEvent("PLAYER_CONTROL_LOST", function() ns:ScheduleUpdate() end)
+ns:RegisterEvent("PLAYER_CONTROL_GAINED", function() ns:ScheduleUpdate() end)
+
+function ns.OnTaxi()
+    return UnitOnTaxi and ns.Bool(UnitOnTaxi, "player") or false
+end
 
 -- Lowest opacity allowed in combat: an (almost) invisible icon would still catch clicks.
 ns.MIN_COMBAT_ALPHA = 0.2
