@@ -20,9 +20,16 @@ local function Label(text, x, template)
     return fs
 end
 
-local function Header(text)
+local function Header(text, icon)
     y = y - 10
-    Label(text, 12, "GameFontNormalLarge")
+    local fs = Label(text, icon and 34 or 12, "GameFontNormalLarge")
+    if icon then
+        local tex = content:CreateTexture(nil, "ARTWORK")
+        tex:SetSize(18, 18)
+        tex:SetPoint("RIGHT", fs, "LEFT", -4, 0)
+        tex:SetTexture(icon)
+        if icon ~= ns.LOGO then tex:SetTexCoord(0.08, 0.92, 0.08, 0.92) end
+    end
     local line = content:CreateTexture(nil, "ARTWORK")
     line:SetColorTexture(1, 1, 1, 0.15)
     line:SetHeight(1)
@@ -206,9 +213,9 @@ local function GlowAndSound(getTbl, glowText, soundText)
     SoundRows(getTbl, soundText)
 end
 
-local function IconSection(title, key, extra)
+local function IconSection(title, key, icon, extra)
     local get = T(key)
-    Header(title)
+    Header(title, icon)
     Check("Enable", function() return get().enabled end, function(v) get().enabled = v end)
     Check("Lock position", function() return get().locked end, function(v) get().locked = v end)
     Slider("Icon size", 16, 128, 1, function() return get().size end, function(v) get().size = v end)
@@ -263,7 +270,7 @@ local function Build()
     scroll:SetScrollChild(content)
 
     -- General
-    Header("General")
+    Header("General", ns.LOGO)
     Check("Preview mode (show all icons for positioning)", function() return ns.db.preview end, function(v) ns.db.preview = v end)
     Check("Simulate combat (opacity, highlight, hiding, click-through)", function() return ns.db.previewCombat end, function(v) ns.db.previewCombat = v end)
     Check("Show minimap button", function() return not ns.db.minimap.hide end, function(v) ns.db.minimap.hide = not v end)
@@ -298,7 +305,7 @@ local function Build()
         "Labels and the shard counter are moved with left-drag. Changes made in combat apply after combat.")
 
     -- Custom sounds: the player's own files, offered in every sound list.
-    Header("Custom sounds")
+    Header("Custom sounds", "Interface\\Icons\\INV_Misc_Drum_01")
     Note("Put .ogg or .mp3 files into World of Warcraft/<client>/Interface/WarlockUpkeepSounds/ and fully restart " ..
         "the game (a /reload doesn't find new files). Then add each file here by its name, e.g. alarm.ogg, " ..
         "or by a full path starting with Interface\\. Added files appear in every Sound list.")
@@ -340,7 +347,7 @@ local function Build()
 
     -- 1. Demon Armor
     if ns.modules.armor then
-        IconSection("Demon Armor / Demon Skin", "armor", function(get)
+        IconSection("Demon Armor / Demon Skin", "armor", "Interface\\Icons\\Spell_Shadow_RagingScream", function(get)
             -- Clients that hide auras from addons in combat (Forever).
             if C_Secrets then
                 Note("Important: add Demon Skin and Demon Armor to the Cooldown Manager's Tracked Buffs. " ..
@@ -354,13 +361,12 @@ local function Build()
     -- 2. Soul Shards
     if ns.modules.shards then
         local sh = T("shards")
-        Header("Soul Shard counter")
+        Header("Soul Shard counter", "Interface\\Icons\\INV_Misc_Gem_Amethyst_02")
         Check("Enable", function() return sh().enabled end, function(v) sh().enabled = v end)
         Check("Lock position", function() return sh().locked end, function(v) sh().locked = v end)
         Check("Show shard icon", function() return sh().showIcon end, function(v) sh().showIcon = v end)
         Slider("Icon size", 12, 96, 1, function() return sh().iconSize end, function(v) sh().iconSize = v end)
         Slider("Background opacity, %", 0, 100, 5, function() return math.floor(sh().bgAlpha * 100 + 0.5) end, function(v) sh().bgAlpha = v / 100 end)
-        Check("Show recommended amount (current/recommended)", function() return sh().showDesired end, function(v) sh().showDesired = v end)
         Slider("Spare shards", 0, 10, 1, function() return sh().spare end, function(v) sh().spare = v end)
         Check("Count Ritual of Summoning in recommended amount", function() return sh().includeRitual end, function(v) sh().includeRitual = v end)
         local recommended = Label("")
@@ -372,6 +378,7 @@ local function Build()
         y = y - 22
         Check("Low threshold = recommended amount", function() return sh().autoThreshold end, function(v) sh().autoThreshold = v end)
         Slider("Highlight when fewer than", 0, 40, 1, function() return sh().threshold end, function(v) sh().threshold = v end)
+        Check("Show the threshold next to the count (current/threshold)", function() return sh().showThreshold end, function(v) sh().showThreshold = v end)
         SubHeader("Text")
         FontRows(sh, { { "Font size", "fontSize" } })
         Color("Text color", function() return sh().color end, function(v) sh().color = v end)
@@ -381,10 +388,10 @@ local function Build()
     end
 
     -- 3. Healthstone
-    IconSection("Healthstone", "healthstone")
+    IconSection("Healthstone", "healthstone", "Interface\\Icons\\INV_Stone_04")
 
     -- 4. Soulstone
-    IconSection("Soulstone", "soulstone", function(get)
+    IconSection("Soulstone", "soulstone", "Interface\\Icons\\Spell_Shadow_SoulGem", function(get)
         if not ns.SHARD_ITEMS then
             -- Cast directly on the target: there's only the "not applied" state.
             GlowAndSound(function() return get().states.use end)
@@ -420,7 +427,7 @@ local function Build()
         "(300x: a second per 5 minutes) and the sounds play on every cycle.")
 
     -- 5. Demon
-    IconSection("Demon (pet)", "pet", function(get)
+    IconSection("Demon (pet)", "pet", "Interface\\Icons\\Spell_Shadow_SummonImp", function(get)
         GlowAndSound(get)
         SubHeader("Demon per click / modifier")
         local P = ns.modules.pet

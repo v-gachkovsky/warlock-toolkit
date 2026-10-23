@@ -70,7 +70,7 @@ ns.defaults = {
         showIcon = true, iconSize = 32, bgAlpha = 0.3,
         font = "Fonts\\FRIZQT__.TTF", fontSize = 20, outline = "OUTLINE",
         color = { 1, 1, 1, 1 }, lowColor = { 1, 0.25, 0.25, 1 },
-        showDesired = true,
+        showThreshold = false, -- "have/threshold" instead of just "have"
         autoThreshold = true, threshold = 3,
         spare = 1, includeRitual = false,
         glow = true, glowColor = { 1, 0.2, 0.2, 1 },
@@ -668,6 +668,15 @@ ns:RegisterEvent("PLAYER_CONTROL_GAINED", function() ns:ScheduleUpdate() end)
 
 function ns.OnTaxi()
     return UnitOnTaxi and ns.Bool(UnitOnTaxi, "player") or false
+end
+
+-- Dying, releasing the spirit and coming back to life.
+ns:RegisterEvent("PLAYER_DEAD", function() ns:ScheduleUpdate() end)
+ns:RegisterEvent("PLAYER_ALIVE", function() ns:ScheduleUpdate() end)
+ns:RegisterEvent("PLAYER_UNGHOST", function() ns:ScheduleUpdate() end)
+
+function ns.IsDead()
+    return ns.Bool(UnitIsDeadOrGhost, "player") or false
 end
 
 -- Lowest opacity allowed in combat: an (almost) invisible icon would still catch clicks.
