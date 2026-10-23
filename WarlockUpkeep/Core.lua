@@ -40,6 +40,7 @@ ns.defaults = {
     healthstone = Icon(-90, 160),
     soulstone = Icon(-45, 160, {
         createWhileApplied = false,
+        hideWhenOthers = false, -- no icon while another warlock's Soulstone is on you
         states = {
             use    = { glow = true, glowColor = { 1, 0.82, 0, 1 }, sound = false, soundName = "READY_CHECK" },
             create = { glow = true, glowColor = { 1, 0.1, 0.1, 1 }, sound = false, soundName = "RAID_WARNING" },

@@ -150,6 +150,8 @@ The icon appears when there's no Healthstone in your bags. Clicking it creates t
 - a timer under the name, with a small Soulstone icon to its left.
 
 If the Soulstone is on the caster, only the timer with the icon is shown, without a name (this can be turned off).
+The same timer shows when another warlock's Soulstone is on you. The *Hide while another warlock's Soulstone
+is on you* option (off by default) also hides the Soulstone icon then.
 
 The label's font, size, outline, icon and background opacity are all configurable. In preview mode the
 label shows your current target's name in class color (or only the timer without a target) with a fast

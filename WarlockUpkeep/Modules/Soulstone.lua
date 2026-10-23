@@ -78,8 +78,21 @@ local function IntendedUnit()
     return "player"
 end
 
+-- "Name" or "Name-Realm" of the caster. Some clients give your own name with the realm,
+-- unlike UnitName("player").
+local function IsMyName(full)
+    full = Safe(full)
+    if not full then return false end
+    local name, realm = full:match("^([^%-]+)%-?(.*)$")
+    if name ~= Safe(UnitName("player")) then return false end
+    if realm == "" then return true end
+    local my = (GetNormalizedRealmName and Safe(GetNormalizedRealmName())) or Safe(GetRealmName()) or ""
+    return (realm:gsub("[%s%-]", "")) == (my:gsub("[%s%-]", ""))
+end
+
 local function UnitByFullName(name)
     if not name then return nil end
+    if IsMyName(name) then return "player" end
     name = name:gsub("%s", "")
     for _, u in ipairs(GroupUnits()) do
         if FullName(u) == name then return u end
@@ -147,8 +160,9 @@ function M:CheckInstance()
 end
 
 local function IsSelf(t)
-    if t.guid then return t.guid == GUIDOf("player") end
-    return (t.full or t.name) == UnitName("player")
+    local me = GUIDOf("player")
+    if t.guid and me then return t.guid == me end
+    return IsMyName(t.full) or IsMyName(t.name)
 end
 
 -- Buff `i` of `unit` cast by the player, as AuraData. Older Classic clients only have UnitBuff.
@@ -160,9 +174,33 @@ local function PlayerBuffByIndex(unit, i)
     if name then return { spellId = spellId, expirationTime = expirationTime } end
 end
 
+-- Server time when another warlock's Soulstone on you runs out, or nil when there's none.
+local function OthersOnSelf()
+    for i = 1, 40 do
+        local spellId, source, expirationTime
+        if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
+            local a = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
+            if not a then break end
+            spellId, source, expirationTime = a.spellId, a.sourceUnit, a.expirationTime
+        else
+            local name, _, _, _, _, ex, src, _, _, id = UnitBuff("player", i)
+            if not name then break end
+            spellId, source, expirationTime = id, src, ex
+        end
+        if isBuff[spellId] and not (source and UnitIsUnit(source, "player")) then
+            if expirationTime and expirationTime > 0 then
+                return GetServerTime() + math.floor(expirationTime - GetTime())
+            end
+            return GetServerTime() + Duration()
+        end
+    end
+end
+
 -- Out of combat: read real auras of the group to confirm/correct the tracked target.
 function M:Scan()
     if ns.AurasSecret() or not (UnitBuff or (C_UnitAuras and C_UnitAuras.GetAuraDataByIndex)) then return end
+    local okOthers, others = pcall(OthersOnSelf)
+    if okOthers then self.others = others end
     local found
     for _, u in ipairs(ScanUnits()) do
         if UnitExists(u) then
@@ -388,6 +426,8 @@ function M:Update()
     local onSelf = selfStone:Read()
     local tracked = self:GetTracked()
     if wasOn and onSelf == false and tracked and IsSelf(tracked) and ns.AurasSecret() then self:SetTracked(nil) end
+    -- Another warlock's Soulstone on you: gone once it runs out or leaves the buff list (also in combat).
+    if self.others and (GetServerTime() >= self.others or onSelf == false) then self.others = nil end
 
     local t = self:GetTracked()
     -- The tracked Soulstone ran out (not removed early): optional sound.
@@ -406,6 +446,8 @@ function M:Update()
         self:ShowLabel(t.name, t.class, t.expires)
     elseif t then
         self:ShowLabel(nil, nil, LabelCfg().showSelf and t.expires or nil)
+    elseif self.others then
+        self:ShowLabel(nil, nil, LabelCfg().showSelf and self.others or nil)
     elseif ns.db.preview then
         -- As if cast now: on the current target, or on yourself without one (timer only).
         local expires = GetServerTime() + Duration()
@@ -419,11 +461,14 @@ function M:Update()
         self:ShowLabel(nil, nil, nil)
     end
 
+    -- Your own Soulstone is out, or (if set) another warlock's is on you: nothing to apply.
+    local applied = t or (ns.db.soulstone.hideWhenOthers and self.others)
+
     if DirectCast() then
         local name = ns.SpellName(D.soulstoneSpell)
         local macro = string.format("/cast [help,nodead] %s; [@player] %s", name, name)
         b:SetAction({ type1 = "macro", macrotext1 = macro }, ns.SpellTexture(D.soulstoneSpell), D.soulstoneSpell)
-        b:SetState(not t and "use" or nil)
+        b:SetState(not applied and "use" or nil)
         return
     end
 
@@ -439,7 +484,7 @@ function M:Update()
     if item then
         local macro = string.format("/use [help,nodead] item:%d; [@player] item:%d", item, item)
         b:SetAction({ type1 = "macro", macrotext1 = macro }, ns.ItemIcon(item), nil, item)
-        b:SetState(not t and "use" or nil)
+        b:SetState(not applied and "use" or nil)
         return
     end
 
@@ -447,7 +492,7 @@ function M:Update()
     local spell, rank = ns.HighestKnown(ranks)
     if spell then
         b:SetSpell(spell, ns.ItemIcon(ranks[rank].items[1]))
-        b:SetState((not t or ns.db.soulstone.createWhileApplied) and "create" or nil)
+        b:SetState((not applied or ns.db.soulstone.createWhileApplied) and "create" or nil)
     elseif ns.SHARD_ITEMS then
         local sample = ranks[1].items[1]
         b:SetUnlearned(ns.ItemIcon(sample), nil, sample)
