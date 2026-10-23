@@ -392,6 +392,7 @@ local function Build()
 
     -- 4. Soulstone
     IconSection("Soulstone", "soulstone", "Interface\\Icons\\Spell_Shadow_SoulGem", function(get)
+        Check("Hide while another warlock's Soulstone is on you", function() return get().hideWhenOthers end, function(v) get().hideWhenOthers = v end)
         if not ns.SHARD_ITEMS then
             -- Cast directly on the target: there's only the "not applied" state.
             GlowAndSound(function() return get().states.use end)
@@ -406,7 +407,7 @@ local function Build()
     local lb = T("soulstoneLabel")
     SubHeader("Soulstone target label")
     Check("Show label (name + timer) when used on another player", function() return lb().enabled end, function(v) lb().enabled = v end)
-    Check("Show timer (without name) when Soulstone is on yourself", function() return lb().showSelf end, function(v) lb().showSelf = v end)
+    Check("Show timer (without name) when Soulstone is on yourself (yours or another warlock's)", function() return lb().showSelf end, function(v) lb().showSelf = v end)
     Check("Lock label position", function() return lb().locked end, function(v) lb().locked = v end)
     Check("Show Soulstone icon left of the timer", function() return lb().showIcon end, function(v) lb().showIcon = v end)
     Slider("Background opacity, %", 0, 100, 5, function() return math.floor(lb().bgAlpha * 100 + 0.5) end, function(v) lb().bgAlpha = v / 100 end)

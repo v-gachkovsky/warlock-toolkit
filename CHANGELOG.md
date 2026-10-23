@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Another warlock's Soulstone on you**: the Soulstone label shows its timer (without a name), and the new
+  option *Hide while another warlock's Soulstone is on you* (off by default) hides the Soulstone icon.
+
 ## [1.3.0] - 2026-10-23
 
 ### Changed

@@ -55,7 +55,8 @@ Appears when there's no Healthstone in your bags. Click to create the strongest 
 - **Red highlight**: no stone in your bags. Click to create one.
 
 When your Soulstone is on another player, a movable label shows **their name in class color and the remaining
-time**. When it's on yourself, only the timer is shown (optional). Font, size, outline, icon and background
+time**. When it's on yourself, or another warlock's Soulstone is on you, only the timer is shown (optional).
+Another warlock's Soulstone on you can also hide the icon (an option, off by default). Font, size, outline, icon and background
 opacity are all configurable.
 
 ### Demon
