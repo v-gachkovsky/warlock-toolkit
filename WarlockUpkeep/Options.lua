@@ -238,10 +238,14 @@ local function Build()
     if not ok then
         f = CreateFrame("Frame", "WarlockUpkeepOptions", UIParent, "BackdropTemplate")
         f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", edgeSize = 24, insets = { left = 6, right = 6, top = 6, bottom = 6 } })
-        local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-        close:SetPoint("TOPRIGHT")
+        f.CloseButton = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+        f.CloseButton:SetPoint("TOPRIGHT")
     end
     panel = f
+    -- The template's button closes through the game's panel manager (HideUIPanel), which sometimes
+    -- leaves this window open; hide it directly instead.
+    local close = f.CloseButton or _G["WarlockUpkeepOptionsCloseButton"]
+    if close then close:SetScript("OnClick", function() f:Hide() end) end
     f:SetSize(540, 620)
     f:SetPoint("CENTER")
     f:SetFrameStrata("DIALOG")

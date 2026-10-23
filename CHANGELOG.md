@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- The close button (X) of the options window now always closes it; before, it sometimes didn't and the
+  window had to be closed from the minimap button.
+
 ## [1.3.0] - 2026-10-23
 
 ### Changed
