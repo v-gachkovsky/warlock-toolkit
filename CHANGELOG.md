@@ -13,6 +13,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ### Fixed
 - The close button (X) of the options window now always closes it; before, it sometimes didn't and the
   window had to be closed from the minimap button.
+- A Soulstone used on yourself no longer shows the label with your own name (in white) until the next aura
+  check: casts on yourself are recognized when the game reports your name with the realm.
 
 ## [1.3.0] - 2026-10-23
 

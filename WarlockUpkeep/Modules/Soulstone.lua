@@ -78,8 +78,21 @@ local function IntendedUnit()
     return "player"
 end
 
+-- "Name" or "Name-Realm" of the caster. Some clients give your own name with the realm,
+-- unlike UnitName("player").
+local function IsMyName(full)
+    full = Safe(full)
+    if not full then return false end
+    local name, realm = full:match("^([^%-]+)%-?(.*)$")
+    if name ~= Safe(UnitName("player")) then return false end
+    if realm == "" then return true end
+    local my = (GetNormalizedRealmName and Safe(GetNormalizedRealmName())) or Safe(GetRealmName()) or ""
+    return (realm:gsub("[%s%-]", "")) == (my:gsub("[%s%-]", ""))
+end
+
 local function UnitByFullName(name)
     if not name then return nil end
+    if IsMyName(name) then return "player" end
     name = name:gsub("%s", "")
     for _, u in ipairs(GroupUnits()) do
         if FullName(u) == name then return u end
@@ -147,8 +160,9 @@ function M:CheckInstance()
 end
 
 local function IsSelf(t)
-    if t.guid then return t.guid == GUIDOf("player") end
-    return (t.full or t.name) == UnitName("player")
+    local me = GUIDOf("player")
+    if t.guid and me then return t.guid == me end
+    return IsMyName(t.full) or IsMyName(t.name)
 end
 
 -- Buff `i` of `unit` cast by the player, as AuraData. Older Classic clients only have UnitBuff.
