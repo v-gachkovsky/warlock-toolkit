@@ -10,6 +10,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - **Another warlock's Soulstone on you**: the Soulstone label shows its timer (without a name), and the new
   option *Hide while another warlock's Soulstone is on you* (off by default) hides the Soulstone icon.
 
+### Fixed
+- The close button (X) of the options window now always closes it; before, it sometimes didn't and the
+  window had to be closed from the minimap button.
+
 ## [1.3.0] - 2026-10-23
 
 ### Changed
