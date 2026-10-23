@@ -10,6 +10,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - The Soul Shard counter now shows just the shards you have. The old *Show recommended amount* option is
   replaced by *Show the threshold next to the count* (off by default): `have/threshold`, where the threshold
   is the one that turns the counter red (the recommended amount unless set manually).
+- Section titles in the options now have matching icons.
+
+### Fixed
+- Icons no longer show while you're dead or a ghost (there's nothing to fix until you're back), and dying
+  doesn't play alert sounds. Preview mode still shows them for positioning.
 
 ## [1.2.0] - 2026-10-22
 
