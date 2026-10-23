@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- A Soulstone used on yourself no longer shows the label with your own name (in white) until the next aura
+  check: casts on yourself are recognized when the game reports your name with the realm.
+
 ## [1.3.0] - 2026-10-23
 
 ### Changed
