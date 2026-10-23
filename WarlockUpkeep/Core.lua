@@ -670,6 +670,15 @@ function ns.OnTaxi()
     return UnitOnTaxi and ns.Bool(UnitOnTaxi, "player") or false
 end
 
+-- Dying, releasing the spirit and coming back to life.
+ns:RegisterEvent("PLAYER_DEAD", function() ns:ScheduleUpdate() end)
+ns:RegisterEvent("PLAYER_ALIVE", function() ns:ScheduleUpdate() end)
+ns:RegisterEvent("PLAYER_UNGHOST", function() ns:ScheduleUpdate() end)
+
+function ns.IsDead()
+    return ns.Bool(UnitIsDeadOrGhost, "player") or false
+end
+
 -- Lowest opacity allowed in combat: an (almost) invisible icon would still catch clicks.
 ns.MIN_COMBAT_ALPHA = 0.2
 

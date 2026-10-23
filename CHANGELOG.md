@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- Icons no longer show while you're dead or a ghost (there's nothing to fix until you're back), and dying
+  doesn't play alert sounds. Preview mode still shows them for positioning.
+
+### Changed
+- Section titles in the options now have matching icons.
+
 ## [1.2.0] - 2026-10-22
 
 ### Added

@@ -566,6 +566,8 @@ function Icon:ShouldShow()
     local cfg = self:Cfg()
     if not cfg.enabled then return false end
     if ns.db.hideOnTaxi and ns.OnTaxi() then return false end
+    -- Nothing to fix while dead (or a ghost); preview still shows the samples for positioning.
+    if ns.IsDead() and not ns.db.preview then return false end
     -- Simulated combat with "hide icons in combat" (real combat hides them in PrepareForCombat).
     if ns.db.previewCombat and not ns.inCombat and ns.db.combat.hide then return false end
     if self.state then return true end
@@ -576,7 +578,7 @@ function Icon:SetState(state)
     if state ~= self.state then
         ns.Trace("icon %s: %s -> %s", self.key, tostring(self.state), tostring(state))
         self.state = state
-        if state and ns.ready and self:Cfg().enabled then
+        if state and ns.ready and self:Cfg().enabled and not ns.IsDead() then
             local sc = self:StateCfg(state)
             if sc.sound then ns.PlaySound(sc.soundName) end
         end
