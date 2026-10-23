@@ -94,16 +94,16 @@ function M:Update()
     -- Bags unreadable (secret in combat): keep the last known count.
     local count = ns.ItemCount(D.SOUL_SHARD) or self.lastCount or 0
     self.lastCount = count
-    local desired, parts = self:Desired()
     -- No Drain Soul yet (low level): no shards to count, so no counter and no "low" alert.
     if not ns.HighestKnown(D.drainSoul) and not ns.db.preview then
         f:Hide()
         self.low = nil
         return
     end
-    local low = count < self:Threshold()
+    local threshold = self:Threshold()
+    local low = count < threshold
 
-    f.text:SetText(cfg.showDesired and string.format("%d/%d", count, desired) or tostring(count))
+    f.text:SetText(cfg.showThreshold and string.format("%d/%d", count, threshold) or tostring(count))
     local c = low and cfg.lowColor or cfg.color
     f.text:SetTextColor(c[1], c[2], c[3], c[4] or 1)
     f.glow:SetGlow(low and cfg.glow and cfg.showIcon, cfg.glowColor, cfg.iconSize)

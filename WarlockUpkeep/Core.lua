@@ -70,7 +70,7 @@ ns.defaults = {
         showIcon = true, iconSize = 32, bgAlpha = 0.3,
         font = "Fonts\\FRIZQT__.TTF", fontSize = 20, outline = "OUTLINE",
         color = { 1, 1, 1, 1 }, lowColor = { 1, 0.25, 0.25, 1 },
-        showDesired = true,
+        showThreshold = false, -- "have/threshold" instead of just "have"
         autoThreshold = true, threshold = 3,
         spare = 1, includeRitual = false,
         glow = true, glowColor = { 1, 0.2, 0.2, 1 },
